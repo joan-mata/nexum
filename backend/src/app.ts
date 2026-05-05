@@ -73,8 +73,7 @@ export function createApp(): express.Application {
     skipSuccessfulRequests: true,
     standardHeaders: true,
     legacyHeaders: false,
-    blockDuration: 30 * 60 * 1000,
-    message: { error: 'Too many login attempts. Please try again in 30 minutes.' },
+    message: { error: 'Too many login attempts. Please try again in 15 minutes.' },
   });
 
   app.use('/api/', generalLimiter);

@@ -82,6 +82,45 @@ export const UsersService = {
     return rows;
   },
 
+  create: async (
+    adminUserId: string,
+    username: string,
+    email: string,
+    role: 'admin' | 'operator',
+    password: string,
+    ip: string,
+    userAgent: string | undefined
+  ): Promise<{ success: false; status: 400 | 409; error: string } | { success: true; user: { id: string; username: string; email: string; role: string } }> => {
+    const { rows: activeCount } = await pool.query(
+      'SELECT COUNT(*) FROM users WHERE is_active = true'
+    );
+    if (parseInt(activeCount[0].count) >= 10) {
+      return { success: false, status: 400, error: 'Maximum active users limit (10) reached' };
+    }
+
+    const { rows: existing } = await pool.query(
+      'SELECT id FROM users WHERE username = $1 OR email = $2',
+      [username, email]
+    );
+    if (existing.length > 0) {
+      return { success: false, status: 409, error: 'El nombre de usuario o email ya existe' };
+    }
+
+    const passwordHash = await bcrypt.hash(password, 14);
+
+    const { rows } = await pool.query(
+      `INSERT INTO users (username, email, password_hash, role, must_change_password, is_active)
+       VALUES ($1, $2, $3, $4, true, true)
+       RETURNING id`,
+      [username, email, passwordHash, role]
+    );
+
+    const userId = rows[0].id as string;
+    await auditLog(adminUserId, 'user_created', 'user', userId, ip, userAgent, undefined, { username, email, role });
+
+    return { success: true, user: { id: userId, username, email, role } };
+  },
+
   invite: async (
     adminUserId: string,
     username: string,
@@ -136,6 +175,39 @@ export const UsersService = {
     } finally {
       client.release();
     }
+  },
+
+  changeOwnPassword: async (
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+    ip: string,
+    userAgent: string | undefined
+  ): Promise<{ success: false; status: 401; error: string } | { success: true }> => {
+    const { rows } = await pool.query(
+      'SELECT password_hash FROM users WHERE id = $1',
+      [userId]
+    );
+
+    if (rows.length === 0 || !(await bcrypt.compare(currentPassword, rows[0].password_hash))) {
+      return { success: false, status: 401, error: 'Contraseña actual incorrecta' };
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 14);
+
+    await pool.query(
+      `UPDATE users SET password_hash = $1, must_change_password = false, updated_at = NOW() WHERE id = $2`,
+      [passwordHash, userId]
+    );
+
+    await pool.query(
+      'UPDATE refresh_tokens SET revoked_at = NOW() WHERE user_id = $1 AND revoked_at IS NULL',
+      [userId]
+    );
+
+    await auditLog(userId, 'user_own_password_changed', 'user', userId, ip, userAgent);
+
+    return { success: true };
   },
 
   changePassword: async (
@@ -197,7 +269,7 @@ export const UsersService = {
     }
 
     const { rows } = await pool.query(
-      'SELECT id, is_active FROM users WHERE id = $1',
+      'SELECT id, is_active, role FROM users WHERE id = $1',
       [targetUserId]
     );
 
@@ -206,6 +278,15 @@ export const UsersService = {
     }
 
     const newState = !rows[0].is_active;
+
+    if (!newState && rows[0].role === 'admin') {
+      const { rows: adminCount } = await pool.query(
+        "SELECT COUNT(*) FROM users WHERE role = 'admin' AND is_active = true"
+      );
+      if (parseInt(adminCount[0].count) <= 1) {
+        return { success: false, status: 400, error: 'No se puede desactivar el último administrador activo' };
+      }
+    }
 
     await pool.query(
       'UPDATE users SET is_active = $1, updated_at = NOW() WHERE id = $2',

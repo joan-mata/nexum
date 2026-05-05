@@ -36,6 +36,8 @@ export interface AuditEntry {
 
 export const usersApi = {
   list: () => client.get<User[]>('/users'),
+  create: (data: { username: string; email: string; role: 'admin' | 'operator'; password: string }) =>
+    client.post<{ user: User }>('/users', data),
   invite: (data: { username: string; email: string; role: 'admin' | 'operator' }) =>
     client.post<InviteResponse>('/users/invite', data),
   acceptInvite: (data: { invite_token: string; password: string }) =>

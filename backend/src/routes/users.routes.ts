@@ -13,6 +13,7 @@ router.use(requireAuth);
 router.use(requireAdmin);
 
 router.get('/', UsersController.list);
+router.post('/', UsersController.create);
 router.post('/invite', UsersController.invite);
 router.put('/:id/password', UsersController.changePassword);
 router.put('/:id/deactivate', UsersController.toggleActive);

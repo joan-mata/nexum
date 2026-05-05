@@ -1,7 +1,8 @@
-import React, { useState, FormEvent } from 'react';
+import { useState, FormEvent } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { AxiosError } from 'axios';
+import { PasswordInput } from '../components/PasswordInput';
 
 export function LoginPage(): JSX.Element {
   const { login } = useAuth();
@@ -75,9 +76,8 @@ export function LoginPage(): JSX.Element {
               <label htmlFor="password" className="label">
                 Contraseña
               </label>
-              <input
+              <PasswordInput
                 id="password"
-                type="password"
                 autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}

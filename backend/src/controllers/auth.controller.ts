@@ -1,6 +1,18 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import { AuthService, getClientIp } from '../services/auth.service';
+import { UsersService } from '../services/users.service';
+
+const changeOwnPasswordSchema = z.object({
+  current_password: z.string().min(1),
+  new_password: z
+    .string()
+    .min(10)
+    .regex(/[A-Z]/, 'Must contain uppercase')
+    .regex(/[a-z]/, 'Must contain lowercase')
+    .regex(/[0-9]/, 'Must contain number')
+    .regex(/[^A-Za-z0-9]/, 'Must contain symbol'),
+});
 
 const loginSchema = z.object({
   username: z.string().min(1).max(50),
@@ -76,5 +88,29 @@ export const AuthController = {
     await AuthService.logoutAll(req.user!.userId);
     res.clearCookie('refresh_token', { path: '/api/auth' });
     res.json({ message: 'All sessions logged out successfully' });
+  },
+
+  changeOwnPassword: async (req: Request, res: Response): Promise<void> => {
+    const parsed = changeOwnPasswordSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Invalid input', details: parsed.error.flatten() });
+      return;
+    }
+
+    const result = await UsersService.changeOwnPassword(
+      req.user!.userId,
+      parsed.data.current_password,
+      parsed.data.new_password,
+      getClientIp(req),
+      req.headers['user-agent']
+    );
+
+    if (!result.success) {
+      res.status(result.status).json({ error: result.error });
+      return;
+    }
+
+    res.clearCookie('refresh_token', { path: '/api/auth' });
+    res.json({ message: 'Contraseña cambiada correctamente. Inicia sesión de nuevo.' });
   },
 };

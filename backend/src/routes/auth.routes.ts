@@ -8,5 +8,6 @@ router.post('/login', AuthController.login);
 router.post('/refresh', AuthController.refresh);
 router.post('/logout', requireAuth, AuthController.logout);
 router.post('/logout-all', requireAuth, AuthController.logoutAll);
+router.post('/change-own-password', requireAuth, AuthController.changeOwnPassword);
 
 export default router;

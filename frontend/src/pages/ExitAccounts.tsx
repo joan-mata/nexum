@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { exitAccountsApi, ExitAccount, ExitAccountInput } from '../api/exitAccounts';
 import { AxiosError } from 'axios';

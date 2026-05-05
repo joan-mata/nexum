@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { usersApi } from '../api/users';
 import { AxiosError } from 'axios';
+import { PasswordInput } from '../components/PasswordInput';
 
 export function AcceptInvitePage(): JSX.Element {
   const navigate = useNavigate();
@@ -84,28 +85,26 @@ export function AcceptInvitePage(): JSX.Element {
             </div>
             <div>
               <label className="label">Nueva contraseña *</label>
-              <input
-                type="password"
+              <PasswordInput
                 className="input"
                 value={form.password}
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
                 required
-                minLength={12}
+                minLength={10}
                 autoComplete="new-password"
               />
               <p className="text-xs text-gray-500 mt-1">
-                Mín. 12 caracteres, mayúsculas, minúsculas, números y símbolos
+                Mín. 10 caracteres, mayúsculas, minúsculas, números y símbolos
               </p>
             </div>
             <div>
               <label className="label">Confirmar contraseña *</label>
-              <input
-                type="password"
+              <PasswordInput
                 className="input"
                 value={form.confirm_password}
                 onChange={(e) => setForm({ ...form, confirm_password: e.target.value })}
                 required
-                minLength={12}
+                minLength={10}
                 autoComplete="new-password"
               />
             </div>

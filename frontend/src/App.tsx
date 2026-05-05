@@ -1,4 +1,3 @@
-import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './hooks/useAuth';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -14,6 +13,7 @@ import { StatisticsPage } from './pages/Statistics';
 import { ExitAccountsPage } from './pages/ExitAccounts';
 import { UsersPage } from './pages/Users';
 import { AcceptInvitePage } from './pages/AcceptInvite';
+import { ChangePasswordPage } from './pages/ChangePassword';
 
 export default function App(): JSX.Element {
   return (
@@ -22,6 +22,14 @@ export default function App(): JSX.Element {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/accept-invite" element={<AcceptInvitePage />} />
+          <Route
+            path="/change-password"
+            element={
+              <ProtectedRoute>
+                <ChangePasswordPage />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/*"
             element={

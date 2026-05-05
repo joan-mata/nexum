@@ -6,7 +6,20 @@ const acceptInviteSchema = z.object({
   invite_token: z.string().min(1),
   password: z
     .string()
-    .min(12)
+    .min(10)
+    .regex(/[A-Z]/, 'Must contain uppercase')
+    .regex(/[a-z]/, 'Must contain lowercase')
+    .regex(/[0-9]/, 'Must contain number')
+    .regex(/[^A-Za-z0-9]/, 'Must contain symbol'),
+});
+
+const createUserSchema = z.object({
+  username: z.string().min(3).max(50),
+  email: z.string().email(),
+  role: z.enum(['admin', 'operator']),
+  password: z
+    .string()
+    .min(10)
     .regex(/[A-Z]/, 'Must contain uppercase')
     .regex(/[a-z]/, 'Must contain lowercase')
     .regex(/[0-9]/, 'Must contain number')
@@ -23,7 +36,7 @@ const changePasswordSchema = z.object({
   admin_password: z.string().min(1),
   new_password: z
     .string()
-    .min(12)
+    .min(10)
     .regex(/[A-Z]/, 'Must contain uppercase')
     .regex(/[a-z]/, 'Must contain lowercase')
     .regex(/[0-9]/, 'Must contain number')
@@ -31,6 +44,32 @@ const changePasswordSchema = z.object({
 });
 
 export const UsersController = {
+  create: async (req: Request, res: Response): Promise<void> => {
+    const parsed = createUserSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Invalid input', details: parsed.error.flatten() });
+      return;
+    }
+
+    const { username, email, role, password } = parsed.data;
+    const result = await UsersService.create(
+      req.user!.userId,
+      username,
+      email,
+      role,
+      password,
+      getClientIp(req),
+      req.headers['user-agent']
+    );
+
+    if (!result.success) {
+      res.status(result.status).json({ error: result.error });
+      return;
+    }
+
+    res.status(201).json({ user: result.user });
+  },
+
   acceptInvite: async (req: Request, res: Response): Promise<void> => {
     const parsed = acceptInviteSchema.safeParse(req.body);
     if (!parsed.success) {

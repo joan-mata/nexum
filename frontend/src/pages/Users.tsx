@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { usersApi, User, AuditEntry } from '../api/users';
 import { AxiosError } from 'axios';
+import { PasswordInput } from '../components/PasswordInput';
 
 function timeAgo(dateStr: string | null): string {
   if (!dateStr) return 'Nunca';
@@ -17,15 +18,16 @@ function timeAgo(dateStr: string | null): string {
 
 export function UsersPage(): JSX.Element {
   const qc = useQueryClient();
-  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState<string | null>(null);
-  const [inviteResult, setInviteResult] = useState<{ token: string; username: string } | null>(null);
   const [activeTab, setActiveTab] = useState<'users' | 'audit'>('users');
 
-  const [inviteForm, setInviteForm] = useState({
+  const [createForm, setCreateForm] = useState({
     username: '',
     email: '',
     role: 'operator' as 'admin' | 'operator',
+    password: '',
+    confirm_password: '',
   });
   const [passwordForm, setPasswordForm] = useState({
     admin_password: '',
@@ -45,16 +47,16 @@ export function UsersPage(): JSX.Element {
     enabled: activeTab === 'audit',
   });
 
-  const inviteMutation = useMutation({
-    mutationFn: (data: typeof inviteForm) => usersApi.invite(data),
-    onSuccess: (res) => {
+  const createMutation = useMutation({
+    mutationFn: (data: { username: string; email: string; role: 'admin' | 'operator'; password: string }) =>
+      usersApi.create(data),
+    onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['users'] });
-      setInviteResult({ token: res.data.invite_token, username: inviteForm.username });
-      setShowInviteModal(false);
-      setInviteForm({ username: '', email: '', role: 'operator' });
+      setShowCreateModal(false);
+      setCreateForm({ username: '', email: '', role: 'operator', password: '', confirm_password: '' });
     },
     onError: (err: AxiosError<{ error: string }>) => {
-      setFormError(err.response?.data?.error ?? 'Error al invitar');
+      setFormError(err.response?.data?.error ?? 'Error al crear usuario');
     },
   });
 
@@ -76,10 +78,19 @@ export function UsersPage(): JSX.Element {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['users'] }),
   });
 
-  const handleInvite = (e: React.FormEvent) => {
+  const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
+    if (createForm.password !== createForm.confirm_password) {
+      setFormError('Las contraseñas no coinciden');
+      return;
+    }
     setFormError(null);
-    inviteMutation.mutate(inviteForm);
+    createMutation.mutate({
+      username: createForm.username,
+      email: createForm.email,
+      role: createForm.role,
+      password: createForm.password,
+    });
   };
 
   const handlePasswordChange = (e: React.FormEvent) => {
@@ -102,8 +113,8 @@ export function UsersPage(): JSX.Element {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-100">Gestión de usuarios</h1>
-        <button onClick={() => { setInviteResult(null); setFormError(null); setShowInviteModal(true); }} className="btn-primary text-sm">
-          + Invitar usuario
+        <button onClick={() => { setFormError(null); setShowCreateModal(true); }} className="btn-primary text-sm">
+          + Crear usuario
         </button>
       </div>
 
@@ -127,26 +138,6 @@ export function UsersPage(): JSX.Element {
         </button>
       </div>
 
-      {/* Invite result */}
-      {inviteResult && (
-        <div className="card bg-green-900/20 border-green-700">
-          <h3 className="text-sm font-semibold text-green-400 mb-2">
-            Invitación creada para {inviteResult.username}
-          </h3>
-          <p className="text-xs text-gray-400 mb-2">
-            Comparte este token de invitación (válido 24h). El usuario deberá usarlo para establecer su contraseña.
-          </p>
-          <code className="block text-xs bg-gray-900 border border-gray-700 rounded p-3 text-green-300 break-all">
-            {inviteResult.token}
-          </code>
-          <button
-            onClick={() => setInviteResult(null)}
-            className="text-xs text-gray-400 hover:text-gray-200 mt-3"
-          >
-            Cerrar
-          </button>
-        </div>
-      )}
 
       {activeTab === 'users' && (
         <>
@@ -277,22 +268,22 @@ export function UsersPage(): JSX.Element {
         </div>
       )}
 
-      {/* Invite Modal */}
-      {showInviteModal && (
+      {/* Create User Modal */}
+      {showCreateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
           <div className="bg-gray-800 rounded-xl border border-gray-700 w-full max-w-md">
             <div className="px-6 py-4 border-b border-gray-700 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-100">Invitar usuario</h2>
-              <button onClick={() => setShowInviteModal(false)} className="text-gray-400 hover:text-gray-100 text-xl">×</button>
+              <h2 className="text-lg font-semibold text-gray-100">Crear usuario</h2>
+              <button onClick={() => setShowCreateModal(false)} className="text-gray-400 hover:text-gray-100 text-xl">×</button>
             </div>
-            <form onSubmit={handleInvite} className="p-6 space-y-4">
+            <form onSubmit={handleCreate} className="p-6 space-y-4">
               <div>
                 <label className="label">Nombre de usuario *</label>
                 <input
                   type="text"
                   className="input"
-                  value={inviteForm.username}
-                  onChange={(e) => setInviteForm({ ...inviteForm, username: e.target.value })}
+                  value={createForm.username}
+                  onChange={(e) => setCreateForm({ ...createForm, username: e.target.value })}
                   required
                   minLength={3}
                 />
@@ -302,8 +293,8 @@ export function UsersPage(): JSX.Element {
                 <input
                   type="email"
                   className="input"
-                  value={inviteForm.email}
-                  onChange={(e) => setInviteForm({ ...inviteForm, email: e.target.value })}
+                  value={createForm.email}
+                  onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
                   required
                 />
               </div>
@@ -311,12 +302,33 @@ export function UsersPage(): JSX.Element {
                 <label className="label">Rol *</label>
                 <select
                   className="input"
-                  value={inviteForm.role}
-                  onChange={(e) => setInviteForm({ ...inviteForm, role: e.target.value as 'admin' | 'operator' })}
+                  value={createForm.role}
+                  onChange={(e) => setCreateForm({ ...createForm, role: e.target.value as 'admin' | 'operator' })}
                 >
                   <option value="operator">Operator</option>
                   <option value="admin">Admin</option>
                 </select>
+              </div>
+              <div>
+                <label className="label">Contraseña temporal *</label>
+                <PasswordInput
+                  className="input"
+                  value={createForm.password}
+                  onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })}
+                  required
+                  minLength={10}
+                />
+                <p className="text-xs text-gray-500 mt-1">El usuario deberá cambiarla en el primer acceso</p>
+              </div>
+              <div>
+                <label className="label">Confirmar contraseña *</label>
+                <PasswordInput
+                  className="input"
+                  value={createForm.confirm_password}
+                  onChange={(e) => setCreateForm({ ...createForm, confirm_password: e.target.value })}
+                  required
+                  minLength={10}
+                />
               </div>
               {formError && (
                 <div className="bg-red-900/30 border border-red-700 text-red-400 text-sm rounded-lg px-4 py-3">
@@ -324,8 +336,10 @@ export function UsersPage(): JSX.Element {
                 </div>
               )}
               <div className="flex gap-3">
-                <button type="submit" className="btn-primary flex-1">Generar invitación</button>
-                <button type="button" onClick={() => setShowInviteModal(false)} className="btn-secondary flex-1">Cancelar</button>
+                <button type="submit" disabled={createMutation.isPending} className="btn-primary flex-1">
+                  {createMutation.isPending ? 'Creando...' : 'Crear usuario'}
+                </button>
+                <button type="button" onClick={() => setShowCreateModal(false)} className="btn-secondary flex-1">Cancelar</button>
               </div>
             </form>
           </div>
@@ -343,8 +357,7 @@ export function UsersPage(): JSX.Element {
             <form onSubmit={handlePasswordChange} className="p-6 space-y-4">
               <div>
                 <label className="label">Tu contraseña de admin *</label>
-                <input
-                  type="password"
+                <PasswordInput
                   className="input"
                   value={passwordForm.admin_password}
                   onChange={(e) => setPasswordForm({ ...passwordForm, admin_password: e.target.value })}
@@ -353,25 +366,23 @@ export function UsersPage(): JSX.Element {
               </div>
               <div>
                 <label className="label">Nueva contraseña *</label>
-                <input
-                  type="password"
+                <PasswordInput
                   className="input"
                   value={passwordForm.new_password}
                   onChange={(e) => setPasswordForm({ ...passwordForm, new_password: e.target.value })}
                   required
-                  minLength={12}
+                  minLength={10}
                 />
-                <p className="text-xs text-gray-500 mt-1">Mín. 12 caracteres, mayúsculas, minúsculas, números y símbolos</p>
+                <p className="text-xs text-gray-500 mt-1">Mín. 10 caracteres, mayúsculas, minúsculas, números y símbolos</p>
               </div>
               <div>
                 <label className="label">Confirmar nueva contraseña *</label>
-                <input
-                  type="password"
+                <PasswordInput
                   className="input"
                   value={passwordForm.confirm_password}
                   onChange={(e) => setPasswordForm({ ...passwordForm, confirm_password: e.target.value })}
                   required
-                  minLength={12}
+                  minLength={10}
                 />
               </div>
               {formError && (
