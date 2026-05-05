@@ -1,0 +1,193 @@
+import pool from '../db/pool';
+import { TransactionType, TransactionStatus } from '../types';
+
+function calcAmounts(
+  amount: number,
+  currency: 'EUR' | 'USD',
+  exchangeRate: number | null | undefined
+): { amount_in_eur: number | null; amount_in_usd: number | null } {
+  if (currency === 'EUR') {
+    const amountInUsd = exchangeRate ? amount * exchangeRate : null;
+    return { amount_in_eur: amount, amount_in_usd: amountInUsd };
+  } else {
+    const amountInEur = exchangeRate ? amount / exchangeRate : null;
+    return { amount_in_eur: amountInEur, amount_in_usd: amount };
+  }
+}
+
+export interface TransactionFilters {
+  date_from?: string;
+  date_to?: string;
+  type?: string;
+  lender_id?: string;
+  currency?: string;
+  status?: string;
+  page?: string;
+  limit?: string;
+}
+
+export const TransactionsService = {
+  findAll: async (filters: TransactionFilters) => {
+    const { date_from, date_to, type, lender_id, currency, status, page = '1', limit = '50' } = filters;
+
+    const conditions: string[] = [];
+    const params: unknown[] = [];
+    let paramIdx = 1;
+
+    if (date_from) { conditions.push(`t.date >= $${paramIdx++}`); params.push(date_from); }
+    if (date_to)   { conditions.push(`t.date <= $${paramIdx++}`); params.push(date_to); }
+    if (type)      { conditions.push(`t.type = $${paramIdx++}`); params.push(type); }
+    if (lender_id) { conditions.push(`t.lender_id = $${paramIdx++}`); params.push(lender_id); }
+    if (currency)  { conditions.push(`t.currency = $${paramIdx++}`); params.push(currency); }
+    if (status)    { conditions.push(`t.status = $${paramIdx++}`); params.push(status); }
+
+    const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    const pageNum = Math.max(1, parseInt(page) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 50));
+    const offset = (pageNum - 1) * limitNum;
+
+    params.push(limitNum, offset);
+
+    const { rows } = await pool.query(
+      `SELECT t.*, l.name AS lender_name, ea.name AS exit_account_name
+       FROM transactions t
+       LEFT JOIN lenders l ON l.id = t.lender_id
+       LEFT JOIN exit_accounts ea ON ea.id = t.exit_account_id
+       ${where}
+       ORDER BY t.date DESC, t.created_at DESC
+       LIMIT $${paramIdx++} OFFSET $${paramIdx}`,
+      params
+    );
+
+    const { rows: countRows } = await pool.query(
+      `SELECT COUNT(*) FROM transactions t ${where}`,
+      params.slice(0, -2)
+    );
+
+    return {
+      data: rows,
+      total: parseInt(countRows[0].count),
+      page: pageNum,
+      limit: limitNum,
+    };
+  },
+
+  getSummary: async () => {
+    const { rows } = await pool.query(
+      `SELECT
+         COALESCE(SUM(CASE WHEN type = 'loan_received' AND status = 'confirmed' THEN amount_in_eur ELSE 0 END), 0) AS total_loaned_eur,
+         COALESCE(SUM(CASE WHEN type = 'loan_received' AND status = 'confirmed' THEN amount_in_usd ELSE 0 END), 0) AS total_loaned_usd,
+         COALESCE(SUM(CASE WHEN type = 'return_received' AND status = 'confirmed' THEN amount_in_eur ELSE 0 END), 0) AS total_returned_eur,
+         COALESCE(SUM(CASE WHEN type = 'return_received' AND status = 'confirmed' THEN amount_in_usd ELSE 0 END), 0) AS total_returned_usd,
+         COALESCE(SUM(CASE WHEN type IN ('lender_payment') AND status = 'confirmed' THEN amount_in_eur ELSE 0 END), 0) AS total_payments_eur,
+         COALESCE(SUM(CASE WHEN type IN ('exchange_fee', 'transfer_fee', 'other_expense') AND status = 'confirmed' THEN amount_in_eur ELSE 0 END), 0) AS total_fees_eur,
+         COUNT(*) FILTER (WHERE status = 'confirmed') AS confirmed_count,
+         COUNT(*) FILTER (WHERE status = 'pending') AS pending_count
+       FROM transactions`
+    );
+    return rows[0];
+  },
+
+  create: async (data: {
+    date: string;
+    type: TransactionType;
+    amount: number;
+    currency: 'EUR' | 'USD';
+    exchange_rate?: number | null;
+    lender_id?: string | null;
+    exit_account_id?: string | null;
+    description: string;
+    reference_transaction_id?: string | null;
+    status: TransactionStatus;
+    notes?: string | null;
+  }, createdBy: string) => {
+    const { amount_in_eur, amount_in_usd } = calcAmounts(data.amount, data.currency, data.exchange_rate);
+
+    const { rows } = await pool.query(
+      `INSERT INTO transactions
+         (date, type, amount, currency, exchange_rate, amount_in_usd, amount_in_eur,
+          lender_id, exit_account_id, description, reference_transaction_id, status, notes, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+       RETURNING *`,
+      [
+        data.date,
+        data.type,
+        data.amount,
+        data.currency,
+        data.exchange_rate ?? null,
+        amount_in_usd,
+        amount_in_eur,
+        data.lender_id ?? null,
+        data.exit_account_id ?? null,
+        data.description,
+        data.reference_transaction_id ?? null,
+        data.status,
+        data.notes ?? null,
+        createdBy,
+      ]
+    );
+    return rows[0];
+  },
+
+  findById: async (id: string) => {
+    const { rows } = await pool.query(
+      `SELECT t.*, l.name AS lender_name, ea.name AS exit_account_name
+       FROM transactions t
+       LEFT JOIN lenders l ON l.id = t.lender_id
+       LEFT JOIN exit_accounts ea ON ea.id = t.exit_account_id
+       WHERE t.id = $1`,
+      [id]
+    );
+    return rows[0] ?? null;
+  },
+
+  update: async (id: string, data: {
+    date: string;
+    type: TransactionType;
+    amount: number;
+    currency: 'EUR' | 'USD';
+    exchange_rate?: number | null;
+    lender_id?: string | null;
+    exit_account_id?: string | null;
+    description: string;
+    reference_transaction_id?: string | null;
+    status: TransactionStatus;
+    notes?: string | null;
+  }) => {
+    const { amount_in_eur, amount_in_usd } = calcAmounts(data.amount, data.currency, data.exchange_rate);
+
+    const { rows } = await pool.query(
+      `UPDATE transactions SET
+         date=$1, type=$2, amount=$3, currency=$4, exchange_rate=$5,
+         amount_in_usd=$6, amount_in_eur=$7, lender_id=$8, exit_account_id=$9,
+         description=$10, reference_transaction_id=$11, status=$12, notes=$13, updated_at=NOW()
+       WHERE id=$14 RETURNING *`,
+      [
+        data.date,
+        data.type,
+        data.amount,
+        data.currency,
+        data.exchange_rate ?? null,
+        amount_in_usd,
+        amount_in_eur,
+        data.lender_id ?? null,
+        data.exit_account_id ?? null,
+        data.description,
+        data.reference_transaction_id ?? null,
+        data.status,
+        data.notes ?? null,
+        id,
+      ]
+    );
+    return rows[0] ?? null;
+  },
+
+  cancel: async (id: string) => {
+    const { rows } = await pool.query(
+      "UPDATE transactions SET status = 'cancelled', updated_at = NOW() WHERE id = $1 RETURNING id",
+      [id]
+    );
+    return rows[0] ?? null;
+  },
+};

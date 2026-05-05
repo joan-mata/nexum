@@ -1,0 +1,73 @@
+services:
+  nexum-db:
+    image: postgres:16-alpine
+    container_name: nexum-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - nexum-postgres-data:/var/lib/postgresql/data
+    networks:
+      - nexum-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  nexum-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: nexum-backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      ADMIN_USERNAME: ${ADMIN_USERNAME}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      NODE_ENV: ${NODE_ENV:-production}
+      CORS_ORIGIN: ${CORS_ORIGIN:-https://nexum.joanmata.com}
+      PORT: ${PORT:-3000}
+    networks:
+      - nexum-net
+    depends_on:
+      nexum-db:
+        condition: service_healthy
+
+  nexum-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: nexum-frontend
+    restart: unless-stopped
+    networks:
+      - nexum-net
+
+  nexum-nginx:
+    image: nginx:stable-alpine
+    container_name: nexum-nginx
+    restart: unless-stopped
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - nexum-net
+      - proxy-net
+    depends_on:
+      - nexum-backend
+      - nexum-frontend
+
+networks:
+  nexum-net:
+    driver: bridge
+    internal: true
+  proxy-net:
+    external: true
+    name: proxy-net
+
+volumes:
+  nexum-postgres-data:
+    name: nexum-postgres-data

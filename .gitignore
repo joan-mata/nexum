@@ -1,0 +1,30 @@
+# Secretos — NUNCA al repositorio
+.env
+*.env.local
+*.env.production
+
+# Dependencias
+node_modules/
+**/node_modules/
+
+# Builds
+dist/
+build/
+.next/
+
+# Docker volumes locales
+postgres-data/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
