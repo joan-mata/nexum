@@ -10,6 +10,8 @@ router.get('/summary', TransactionsController.getSummary);
 router.post('/', TransactionsController.create);
 router.get('/:id', TransactionsController.getById);
 router.put('/:id', TransactionsController.update);
+router.put('/:id/recurring', TransactionsController.updateAllRecurring);
+router.put('/:id/recurrence-end', TransactionsController.updateRecurrenceEnd);
 router.delete('/:id', TransactionsController.cancel);
 
 export default router;

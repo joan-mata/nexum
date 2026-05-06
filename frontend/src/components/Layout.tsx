@@ -1,20 +1,39 @@
 import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../hooks/useAuth';
 import { formatDate } from '../utils/date';
+import { settingsApi, SidebarItem } from '../api/settings';
 
-const NAV_ITEMS = [
-  { to: '/dashboard', label: 'Dashboard', icon: '◈' },
-  { to: '/transactions', label: 'Transacciones', icon: '↕' },
-  { to: '/lenders', label: 'Prestamistas', icon: '◉' },
-  { to: '/calendar', label: 'Calendario', icon: '▦' },
-  { to: '/statistics', label: 'Estadísticas', icon: '▣' },
-  { to: '/exit-accounts', label: 'Cuentas salida', icon: '⊞' },
+const DEFAULT_NAV: { to: string; label: string; icon: string }[] = [
+  { to: '/dashboard',    label: 'Dashboard',      icon: '◈' },
+  { to: '/transactions', label: 'Transacciones',  icon: '↕' },
+  { to: '/lenders',      label: 'Prestamistas',   icon: '👤' },
+  { to: '/calendar',     label: 'Calendario',     icon: '▦' },
+  { to: '/this-month',   label: 'Mensual',        icon: '◷' },
+  { to: '/statistics',   label: 'Estadísticas',   icon: '▣' },
 ];
 
-const ADMIN_NAV_ITEMS = [
-  { to: '/users', label: 'Usuarios', icon: '◎' },
-];
+const ADMIN_NAV = [{ to: '/users', label: 'Usuarios', icon: '◎' }];
+
+function applyConfig(
+  config: SidebarItem[]
+): { to: string; label: string; icon: string }[] {
+  if (!config.length) return DEFAULT_NAV;
+
+  const iconMap = Object.fromEntries(DEFAULT_NAV.map((n) => [n.to, n.icon]));
+  const defaultSet = new Set(DEFAULT_NAV.map((n) => n.to));
+
+  const ordered = config
+    .filter((c) => defaultSet.has(c.to))
+    .map((c) => ({ to: c.to, label: c.label, icon: iconMap[c.to] ?? '' }));
+
+  // Append any new routes not yet in saved config
+  for (const d of DEFAULT_NAV) {
+    if (!ordered.find((o) => o.to === d.to)) ordered.push(d);
+  }
+  return ordered;
+}
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -23,7 +42,38 @@ interface LayoutProps {
 export function Layout({ children }: LayoutProps): JSX.Element {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<{ to: string; label: string; icon: string }[]>([]);
+
+  const { data: savedConfig = [] } = useQuery({
+    queryKey: ['sidebar-config'],
+    queryFn: () => settingsApi.getSidebar().then((r) => r.data),
+  });
+
+  const saveMutation = useMutation({
+    mutationFn: (config: SidebarItem[]) => settingsApi.updateSidebar(config),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['sidebar-config'] });
+      setEditing(false);
+    },
+  });
+
+  const navItems = applyConfig(savedConfig);
+
+  const openEdit = () => {
+    setDraft(navItems.map((n) => ({ ...n })));
+    setEditing(true);
+  };
+
+  const move = (idx: number, dir: -1 | 1) => {
+    const next = [...draft];
+    const swap = idx + dir;
+    if (swap < 0 || swap >= next.length) return;
+    [next[idx], next[swap]] = [next[swap]!, next[idx]!];
+    setDraft(next);
+  };
 
   const handleLogout = async () => {
     await logout();
@@ -53,7 +103,7 @@ export function Layout({ children }: LayoutProps): JSX.Element {
 
         {/* Navigation */}
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          {NAV_ITEMS.map((item) => (
+          {navItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
@@ -72,7 +122,7 @@ export function Layout({ children }: LayoutProps): JSX.Element {
                   Administración
                 </p>
               </div>
-              {ADMIN_NAV_ITEMS.map((item) => (
+              {ADMIN_NAV.map((item) => (
                 <NavLink
                   key={item.to}
                   to={item.to}
@@ -83,6 +133,13 @@ export function Layout({ children }: LayoutProps): JSX.Element {
                   {item.label}
                 </NavLink>
               ))}
+              <button
+                onClick={openEdit}
+                className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-gray-500 hover:bg-gray-800 hover:text-gray-300 transition-colors mt-1"
+              >
+                <span className="text-lg leading-none">⚙</span>
+                Personalizar menú
+              </button>
             </>
           )}
         </nav>
@@ -144,6 +201,74 @@ export function Layout({ children }: LayoutProps): JSX.Element {
           {children}
         </main>
       </div>
+
+      {/* Edit sidebar modal (admin only) */}
+      {editing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
+          <div className="bg-gray-800 rounded-xl border border-gray-700 w-full max-w-sm">
+            <div className="px-6 py-4 border-b border-gray-700 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-100">Personalizar menú</h2>
+              <button
+                onClick={() => setEditing(false)}
+                className="text-gray-400 hover:text-gray-100 text-xl leading-none"
+              >
+                ×
+              </button>
+            </div>
+            <div className="p-4 space-y-2 max-h-[60vh] overflow-y-auto">
+              {draft.map((item, idx) => (
+                <div key={item.to} className="flex items-center gap-2 bg-gray-700/40 rounded-lg px-3 py-2">
+                  <span className="text-gray-500 text-base leading-none w-5 text-center shrink-0">
+                    {item.icon}
+                  </span>
+                  <input
+                    type="text"
+                    className="flex-1 bg-transparent text-sm text-gray-100 outline-none border-b border-transparent focus:border-gray-500 py-0.5"
+                    value={item.label}
+                    maxLength={30}
+                    onChange={(e) => {
+                      const next = [...draft];
+                      next[idx] = { ...next[idx]!, label: e.target.value };
+                      setDraft(next);
+                    }}
+                  />
+                  <div className="flex flex-col gap-0.5 shrink-0">
+                    <button
+                      onClick={() => move(idx, -1)}
+                      disabled={idx === 0}
+                      className="text-gray-500 hover:text-gray-200 disabled:opacity-20 leading-none text-xs px-1"
+                    >
+                      ▲
+                    </button>
+                    <button
+                      onClick={() => move(idx, 1)}
+                      disabled={idx === draft.length - 1}
+                      className="text-gray-500 hover:text-gray-200 disabled:opacity-20 leading-none text-xs px-1"
+                    >
+                      ▼
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="px-6 py-4 border-t border-gray-700 flex gap-3">
+              <button
+                onClick={() => saveMutation.mutate(draft.map(({ to, label }) => ({ to, label })))}
+                disabled={saveMutation.isPending}
+                className="btn-primary flex-1"
+              >
+                {saveMutation.isPending ? 'Guardando...' : 'Guardar'}
+              </button>
+              <button
+                onClick={() => setEditing(false)}
+                className="btn-secondary flex-1"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

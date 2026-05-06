@@ -12,6 +12,7 @@ import transactionsRoutes from './routes/transactions.routes';
 import dashboardRoutes from './routes/dashboard.routes';
 import calendarRoutes from './routes/calendar.routes';
 import exitAccountsRoutes from './routes/exit-accounts.routes';
+import settingsRoutes from './routes/settings.routes';
 
 export function createApp(): express.Application {
   const app = express();
@@ -87,6 +88,7 @@ export function createApp(): express.Application {
   app.use('/api/dashboard', dashboardRoutes);
   app.use('/api/calendar', calendarRoutes);
   app.use('/api/exit-accounts', exitAccountsRoutes);
+  app.use('/api/settings', settingsRoutes);
 
   // Health check (no rate limit)
   app.get('/api/health', (_req, res) => {

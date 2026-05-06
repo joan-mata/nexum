@@ -21,7 +21,7 @@ const transactionBaseSchema = z.object({
   currency: z.enum(['EUR', 'USD']),
   exchange_rate: z.number().positive().optional().nullable(),
   lender_id: z.string().uuid().optional().nullable(),
-  exit_account_id: z.string().uuid().optional().nullable(),
+  exit_account_name: z.string().max(255).optional().nullable(),
   description: z.string().max(1000).optional().nullable(),
   reference_transaction_id: z.string().uuid().optional().nullable(),
   status: z.enum(['pending', 'confirmed', 'cancelled']).default('confirmed'),
@@ -97,6 +97,36 @@ export const TransactionsController = {
       return;
     }
     res.json(transaction);
+  },
+
+  updateRecurrenceEnd: async (req: Request, res: Response): Promise<void> => {
+    const { end_date } = req.body;
+    if (!end_date || !/^\d{4}-\d{2}-\d{2}$/.test(end_date)) {
+      res.status(400).json({ error: 'end_date debe tener formato AAAA-MM-DD' });
+      return;
+    }
+    try {
+      const result = await TransactionsService.updateRecurrenceEnd(req.params['id']!, end_date);
+      if (!result) { res.status(404).json({ error: 'Transacción no encontrada' }); return; }
+      res.json(result);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error interno';
+      res.status(400).json({ error: msg });
+    }
+  },
+
+  updateAllRecurring: async (req: Request, res: Response): Promise<void> => {
+    const parsed = transactionSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Datos inválidos', details: parsed.error.flatten() });
+      return;
+    }
+    const result = await TransactionsService.updateAllRecurring(req.params['id']!, parsed.data);
+    if (!result) {
+      res.status(404).json({ error: 'Transacción no encontrada' });
+      return;
+    }
+    res.json({ updated: result.length });
   },
 
   cancel: async (req: Request, res: Response): Promise<void> => {

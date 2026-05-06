@@ -10,7 +10,6 @@ import {
   TransactionFilters,
 } from '../api/transactions';
 import { lendersApi } from '../api/lenders';
-import { exitAccountsApi } from '../api/exitAccounts';
 import { AxiosError } from 'axios';
 import { RecurrenceFields } from '../components/RecurrenceFields';
 import { EMPTY_RECURRENCE, RecurrenceState } from '../utils/recurrence';
@@ -26,7 +25,7 @@ const EMPTY_FORM: TransactionInput = {
   currency: 'EUR',
   exchange_rate: null,
   lender_id: null,
-  exit_account_id: null,
+  exit_account_name: null,
   description: '',
   status: 'confirmed',
   notes: null,
@@ -57,11 +56,6 @@ export function TransactionsPage(): JSX.Element {
   const { data: lenders = [] } = useQuery({
     queryKey: ['lenders'],
     queryFn: () => lendersApi.list().then((r) => r.data),
-  });
-
-  const { data: exitAccounts = [] } = useQuery({
-    queryKey: ['exit-accounts'],
-    queryFn: () => exitAccountsApi.list().then((r) => r.data),
   });
 
   const createMutation = useMutation({
@@ -117,7 +111,7 @@ export function TransactionsPage(): JSX.Element {
       currency: tx.currency,
       exchange_rate: tx.exchange_rate ? Number(tx.exchange_rate) : null,
       lender_id: tx.lender_id,
-      exit_account_id: tx.exit_account_id,
+      exit_account_name: tx.exit_account_name,
       description: tx.description,
       status: tx.status,
       notes: tx.notes,
@@ -412,13 +406,22 @@ export function TransactionsPage(): JSX.Element {
                 </div>
               </div>
 
+              {!editTx && (
+                <RecurrenceFields
+                  type={recurrence.type}
+                  endDate={recurrence.endDate}
+                  minDate={form.date}
+                  onChange={(type, endDate) => setRecurrence({ type, endDate })}
+                />
+              )}
+
               <div>
                 <label className="label">Tipo *</label>
                 <select
                   className="input"
                   value={form.type}
                   onChange={(e) =>
-                    setForm({ ...form, type: e.target.value as TransactionType, lender_id: null, exit_account_id: null })
+                    setForm({ ...form, type: e.target.value as TransactionType, lender_id: null, exit_account_name: null })
                   }
                   required
                 >
@@ -492,18 +495,13 @@ export function TransactionsPage(): JSX.Element {
               {TYPES_NEEDING_EXIT.includes(form.type) && (
                 <div>
                   <label className="label">Cuenta de salida</label>
-                  <select
+                  <input
+                    type="text"
                     className="input"
-                    value={form.exit_account_id ?? ''}
-                    onChange={(e) => setForm({ ...form, exit_account_id: e.target.value || null })}
-                  >
-                    <option value="">Sin cuenta</option>
-                    {exitAccounts.map((ea) => (
-                      <option key={ea.id} value={ea.id}>
-                        {ea.name} ({ea.currency})
-                      </option>
-                    ))}
-                  </select>
+                    placeholder="Ej: IBAN / nombre de cuenta"
+                    value={form.exit_account_name ?? ''}
+                    onChange={(e) => setForm({ ...form, exit_account_name: e.target.value || null })}
+                  />
                 </div>
               )}
 
@@ -526,15 +524,6 @@ export function TransactionsPage(): JSX.Element {
                   onChange={(e) => setForm({ ...form, notes: e.target.value || null })}
                 />
               </div>
-
-              {!editTx && (
-                <RecurrenceFields
-                  type={recurrence.type}
-                  endDate={recurrence.endDate}
-                  minDate={form.date}
-                  onChange={(type, endDate) => setRecurrence({ type, endDate })}
-                />
-              )}
 
               {formError && (
                 <div className="bg-red-900/30 border border-red-700 text-red-400 text-sm rounded-lg px-4 py-3">

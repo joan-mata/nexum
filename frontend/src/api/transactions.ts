@@ -24,12 +24,14 @@ export interface Transaction {
   amount_in_eur: number | null;
   lender_id: string | null;
   lender_name: string | null;
-  exit_account_id: string | null;
   exit_account_name: string | null;
   description: string;
   reference_transaction_id: string | null;
   status: TransactionStatus;
   notes: string | null;
+  recurrence_master_id: string | null;
+  recurrence_end_date: string | null;
+  series_recurrence_end_date: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -42,7 +44,7 @@ export interface TransactionInput {
   currency: 'EUR' | 'USD';
   exchange_rate?: number | null;
   lender_id?: string | null;
-  exit_account_id?: string | null;
+  exit_account_name?: string | null;
   description: string;
   reference_transaction_id?: string | null;
   status?: TransactionStatus;
@@ -87,6 +89,10 @@ export const transactionsApi = {
   update: (id: string, data: TransactionInput) =>
     client.put<Transaction>(`/transactions/${id}`, data),
   cancel: (id: string) => client.delete(`/transactions/${id}`),
+  updateAllRecurring: (id: string, data: TransactionInput) =>
+    client.put(`/transactions/${id}/recurring`, data),
+  updateRecurrenceEnd: (id: string, end_date: string) =>
+    client.put(`/transactions/${id}/recurrence-end`, { end_date }),
 };
 
 export const TRANSACTION_TYPE_LABELS: Record<TransactionType, string> = {

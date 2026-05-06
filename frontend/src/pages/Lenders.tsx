@@ -8,7 +8,7 @@ function fmt(n: number): string {
   return new Intl.NumberFormat('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
 }
 
-const EMPTY_FORM: LenderInput = { name: '', email: null, phone: null, notes: null };
+const EMPTY_FORM: LenderInput = { name: '', email: null, phone: null, account_number: null, notes: null };
 
 export function LendersPage(): JSX.Element {
   const qc = useQueryClient();
@@ -59,7 +59,7 @@ export function LendersPage(): JSX.Element {
   };
 
   const openEdit = (l: (typeof lenders)[0]) => {
-    setForm({ name: l.name, email: l.email, phone: l.phone, notes: l.notes });
+    setForm({ name: l.name, email: l.email, phone: l.phone, account_number: l.account_number, notes: l.notes });
     setEditId(l.id);
     setFormError(null);
     setShowModal(true);
@@ -195,6 +195,16 @@ export function LendersPage(): JSX.Element {
                   className="input"
                   value={form.phone ?? ''}
                   onChange={(e) => setForm({ ...form, phone: e.target.value || null })}
+                />
+              </div>
+              <div>
+                <label className="label">Número de cuenta</label>
+                <input
+                  type="text"
+                  className="input"
+                  placeholder="IBAN / número de cuenta"
+                  value={form.account_number ?? ''}
+                  onChange={(e) => setForm({ ...form, account_number: e.target.value || null })}
                 />
               </div>
               <div>

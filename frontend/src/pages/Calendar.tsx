@@ -450,6 +450,16 @@ export function CalendarPage(): JSX.Element {
                   required
                 />
               </div>
+
+              {!editEvent && (
+                <RecurrenceFields
+                  type={(form.recurrence_type ?? 'none') as RecurrenceType}
+                  endDate={form.recurrence_end_date ?? null}
+                  minDate={form.expected_date}
+                  onChange={(type, endDate) => setForm({ ...form, recurrence_type: type, recurrence_end_date: endDate })}
+                />
+              )}
+
               <div>
                 <label className="label">Tipo *</label>
                 <input
@@ -521,15 +531,6 @@ export function CalendarPage(): JSX.Element {
                   onChange={(e) => setForm({ ...form, notes: e.target.value || null })}
                 />
               </div>
-
-              {!editEvent && (
-                <RecurrenceFields
-                  type={(form.recurrence_type ?? 'none') as RecurrenceType}
-                  endDate={form.recurrence_end_date ?? null}
-                  minDate={form.expected_date}
-                  onChange={(type, endDate) => setForm({ ...form, recurrence_type: type, recurrence_end_date: endDate })}
-                />
-              )}
 
               {formError && (
                 <div className="bg-red-900/30 border border-red-700 text-red-400 text-sm rounded-lg px-4 py-3">
