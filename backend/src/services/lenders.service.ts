@@ -19,14 +19,15 @@ export const LendersService = {
     name: string,
     email: string | null | undefined,
     phone: string | null | undefined,
+    accountNumber: string | null | undefined,
     notes: string | null | undefined,
     createdBy: string
   ) => {
     const { rows } = await pool.query(
-      `INSERT INTO lenders (name, email, phone, notes, created_by)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO lenders (name, email, phone, account_number, notes, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING *`,
-      [name, email ?? null, phone ?? null, notes ?? null, createdBy]
+      [name, email ?? null, phone ?? null, accountNumber ?? null, notes ?? null, createdBy]
     );
     return rows[0];
   },
@@ -67,12 +68,13 @@ export const LendersService = {
     name: string,
     email: string | null | undefined,
     phone: string | null | undefined,
+    accountNumber: string | null | undefined,
     notes: string | null | undefined
   ) => {
     const { rows } = await pool.query(
-      `UPDATE lenders SET name = $1, email = $2, phone = $3, notes = $4, updated_at = NOW()
-       WHERE id = $5 RETURNING *`,
-      [name, email ?? null, phone ?? null, notes ?? null, id]
+      `UPDATE lenders SET name = $1, email = $2, phone = $3, account_number = $4, notes = $5, updated_at = NOW()
+       WHERE id = $6 RETURNING *`,
+      [name, email ?? null, phone ?? null, accountNumber ?? null, notes ?? null, id]
     );
     return rows[0] ?? null;
   },

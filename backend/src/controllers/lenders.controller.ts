@@ -6,6 +6,7 @@ const lenderSchema = z.object({
   name: z.string().min(1).max(255),
   email: z.string().email().optional().nullable(),
   phone: z.string().max(50).optional().nullable(),
+  account_number: z.string().max(255).optional().nullable(),
   notes: z.string().optional().nullable(),
 });
 
@@ -22,8 +23,8 @@ export const LendersController = {
       return;
     }
 
-    const { name, email, phone, notes } = parsed.data;
-    const lender = await LendersService.create(name, email, phone, notes, req.user!.userId);
+    const { name, email, phone, account_number, notes } = parsed.data;
+    const lender = await LendersService.create(name, email, phone, account_number, notes, req.user!.userId);
     res.status(201).json(lender);
   },
 
@@ -52,8 +53,8 @@ export const LendersController = {
       return;
     }
 
-    const { name, email, phone, notes } = parsed.data;
-    const lender = await LendersService.update(req.params['id']!, name, email, phone, notes);
+    const { name, email, phone, account_number, notes } = parsed.data;
+    const lender = await LendersService.update(req.params['id']!, name, email, phone, account_number, notes);
     if (!lender) {
       res.status(404).json({ error: 'Prestamista no encontrado' });
       return;

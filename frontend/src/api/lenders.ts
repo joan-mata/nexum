@@ -5,6 +5,7 @@ export interface Lender {
   name: string;
   email: string | null;
   phone: string | null;
+  account_number: string | null;
   notes: string | null;
   is_active: boolean;
   created_at: string;
@@ -31,6 +32,7 @@ export interface LenderInput {
   name: string;
   email?: string | null;
   phone?: string | null;
+  account_number?: string | null;
   notes?: string | null;
 }
 

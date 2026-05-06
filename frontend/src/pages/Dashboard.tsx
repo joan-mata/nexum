@@ -85,8 +85,9 @@ export function DashboardPage(): JSX.Element {
           value={`€${fmt(Number(kpi?.total_fees_eur ?? 0))}`}
         />
         <KPICard
-          label="Saldo estimado"
+          label="Dinero disponible"
           value={`€${fmt(Number(kpi?.balance_eur ?? 0))}`}
+          sub="Entradas − Salidas confirmadas"
         />
       </div>
 

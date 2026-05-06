@@ -1,0 +1,1 @@
+ALTER TABLE lenders ADD COLUMN IF NOT EXISTS account_number VARCHAR(255);

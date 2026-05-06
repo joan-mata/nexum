@@ -1,6 +1,7 @@
 import { useParams, Link } from 'react-router-dom';
+import { useState } from 'react';
 import { formatDate } from '../utils/date';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   LineChart,
   Line,
@@ -10,7 +11,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
-import { lendersApi } from '../api/lenders';
+import { lendersApi, LenderInput } from '../api/lenders';
 import { TRANSACTION_TYPE_LABELS, INFLOW_TYPES } from '../api/transactions';
 
 function fmt(n: number): string {
@@ -19,12 +20,40 @@ function fmt(n: number): string {
 
 export function LenderDetailPage(): JSX.Element {
   const { id } = useParams<{ id: string }>();
+  const qc = useQueryClient();
+  const [editing, setEditing] = useState(false);
+  const [editForm, setEditForm] = useState<LenderInput>({ name: '', email: null, phone: null, account_number: null, notes: null });
+  const [copied, setCopied] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['lender', id, 'stats'],
     queryFn: () => lendersApi.getStats(id!).then((r) => r.data),
     enabled: !!id,
   });
+
+  const updateMutation = useMutation({
+    mutationFn: (data: LenderInput) => lendersApi.update(id!, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['lender', id, 'stats'] });
+      qc.invalidateQueries({ queryKey: ['lenders'] });
+      setEditing(false);
+    },
+  });
+
+  const openEdit = () => {
+    const l = data?.lender;
+    if (!l) return;
+    setEditForm({ name: l.name, email: l.email, phone: l.phone, account_number: l.account_number, notes: l.notes });
+    setEditing(true);
+  };
+
+  const copyAccount = () => {
+    const acc = data?.lender?.account_number;
+    if (!acc) return;
+    navigator.clipboard.writeText(acc);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   if (isLoading) {
     return (
@@ -76,12 +105,62 @@ export function LenderDetailPage(): JSX.Element {
       </div>
 
       <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-100">{lender.name}</h1>
-          {lender.email && <p className="text-gray-400">{lender.email}</p>}
-          {lender.phone && <p className="text-gray-400">{lender.phone}</p>}
-          {lender.notes && <p className="text-gray-500 text-sm mt-2">{lender.notes}</p>}
+        <div className="flex-1 min-w-0">
+          {editing ? (
+            <form
+              onSubmit={(e) => { e.preventDefault(); updateMutation.mutate(editForm); }}
+              className="card space-y-3 max-w-lg"
+            >
+              <h2 className="text-base font-semibold text-gray-100">Editar prestamista</h2>
+              <div>
+                <label className="label">Nombre *</label>
+                <input className="input" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} required />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="label">Email</label>
+                  <input type="email" className="input" value={editForm.email ?? ''} onChange={(e) => setEditForm({ ...editForm, email: e.target.value || null })} />
+                </div>
+                <div>
+                  <label className="label">Teléfono</label>
+                  <input className="input" value={editForm.phone ?? ''} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value || null })} />
+                </div>
+              </div>
+              <div>
+                <label className="label">Número de cuenta / IBAN</label>
+                <input className="input font-mono" value={editForm.account_number ?? ''} onChange={(e) => setEditForm({ ...editForm, account_number: e.target.value || null })} placeholder="ES00 0000 0000 0000 0000 0000" />
+              </div>
+              <div>
+                <label className="label">Notas</label>
+                <textarea className="input h-16 resize-none" value={editForm.notes ?? ''} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value || null })} />
+              </div>
+              <div className="flex gap-3">
+                <button type="submit" disabled={updateMutation.isPending} className="btn-primary flex-1">
+                  {updateMutation.isPending ? 'Guardando...' : 'Guardar'}
+                </button>
+                <button type="button" onClick={() => setEditing(false)} className="btn-secondary flex-1">Cancelar</button>
+              </div>
+            </form>
+          ) : (
+            <>
+              <h1 className="text-2xl font-bold text-gray-100">{lender.name}</h1>
+              {lender.email && <p className="text-gray-400">{lender.email}</p>}
+              {lender.phone && <p className="text-gray-400">{lender.phone}</p>}
+              {lender.account_number && (
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-sm font-mono text-gray-300">{lender.account_number}</span>
+                  <button onClick={copyAccount} className="text-xs text-brand-400 hover:text-brand-300">
+                    {copied ? '✓ Copiado' : 'Copiar'}
+                  </button>
+                </div>
+              )}
+              {lender.notes && <p className="text-gray-500 text-sm mt-2">{lender.notes}</p>}
+            </>
+          )}
         </div>
+        {!editing && (
+          <button onClick={openEdit} className="btn-secondary text-sm ml-4 shrink-0">Editar</button>
+        )}
       </div>
 
       {/* Stats */}
