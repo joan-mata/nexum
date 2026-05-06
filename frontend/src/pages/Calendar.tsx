@@ -4,6 +4,8 @@ import { calendarApi, EventInput, ScheduledEvent } from '../api/calendar';
 import { lendersApi } from '../api/lenders';
 import { transactionsApi, Transaction, TransactionType, TRANSACTION_TYPE_LABELS } from '../api/transactions';
 import { AxiosError } from 'axios';
+import { RecurrenceFields } from '../components/RecurrenceFields';
+import { RECURRENCE_LABELS, RecurrenceType } from '../utils/recurrence';
 
 const INCOME_TYPES = new Set<TransactionType>(['loan_received', 'return_received', 'reinvestment']);
 const isIncome = (type: TransactionType) => INCOME_TYPES.has(type);
@@ -26,11 +28,6 @@ const MONTH_NAMES = [
 ];
 const DAY_NAMES = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
-const RECURRENCE_LABELS: Record<'none' | 'weekly' | 'monthly', string> = {
-  none: 'Nunca',
-  weekly: 'Semanal',
-  monthly: 'Mensual',
-};
 
 const EMPTY_FORM: EventInput = {
   expected_date: new Date().toISOString().slice(0, 10),
@@ -525,43 +522,13 @@ export function CalendarPage(): JSX.Element {
                 />
               </div>
 
-              {/* Recurrence — only when creating */}
               {!editEvent && (
-                <div className="border-t border-gray-700 pt-4 space-y-3">
-                  <div>
-                    <label className="label">Repetir</label>
-                    <select
-                      className="input"
-                      value={form.recurrence_type ?? 'none'}
-                      onChange={(e) =>
-                        setForm({
-                          ...form,
-                          recurrence_type: e.target.value as 'none' | 'weekly' | 'monthly',
-                          recurrence_end_date: null,
-                        })
-                      }
-                    >
-                      <option value="none">Nunca</option>
-                      <option value="weekly">Semanal</option>
-                      <option value="monthly">Mensual</option>
-                    </select>
-                  </div>
-                  {form.recurrence_type !== 'none' && (
-                    <div>
-                      <label className="label">Hasta *</label>
-                      <input
-                        type="date"
-                        className="input"
-                        value={form.recurrence_end_date ?? ''}
-                        min={form.expected_date}
-                        onChange={(e) =>
-                          setForm({ ...form, recurrence_end_date: e.target.value || null })
-                        }
-                        required
-                      />
-                    </div>
-                  )}
-                </div>
+                <RecurrenceFields
+                  type={(form.recurrence_type ?? 'none') as RecurrenceType}
+                  endDate={form.recurrence_end_date ?? null}
+                  minDate={form.expected_date}
+                  onChange={(type, endDate) => setForm({ ...form, recurrence_type: type, recurrence_end_date: endDate })}
+                />
               )}
 
               {formError && (

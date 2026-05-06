@@ -1,4 +1,5 @@
 import pool from '../db/pool';
+import { generateRecurringDates } from '../utils/recurrence';
 import { TransactionType, TransactionStatus } from '../types';
 
 function calcAmounts(
@@ -101,33 +102,49 @@ export const TransactionsService = {
     reference_transaction_id?: string | null;
     status: TransactionStatus;
     notes?: string | null;
+    recurrence_type?: 'none' | 'weekly' | 'monthly';
+    recurrence_end_date?: string | null;
   }, createdBy: string) => {
     const { amount_in_eur, amount_in_usd } = calcAmounts(data.amount, data.currency, data.exchange_rate);
+    const recurrenceType = data.recurrence_type ?? 'none';
+    const recurrenceEndDate = data.recurrence_end_date ?? null;
+    const isRecurring = recurrenceType !== 'none' && recurrenceEndDate;
 
-    const { rows } = await pool.query(
-      `INSERT INTO transactions
-         (date, type, amount, currency, exchange_rate, amount_in_usd, amount_in_eur,
-          lender_id, exit_account_id, description, reference_transaction_id, status, notes, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
-       RETURNING *`,
-      [
-        data.date,
-        data.type,
-        data.amount,
-        data.currency,
-        data.exchange_rate ?? null,
-        amount_in_usd,
-        amount_in_eur,
-        data.lender_id ?? null,
-        data.exit_account_id ?? null,
-        data.description,
-        data.reference_transaction_id ?? null,
-        data.status,
-        data.notes ?? null,
-        createdBy,
-      ]
-    );
-    return rows[0];
+    const SQL = `INSERT INTO transactions
+       (date, type, amount, currency, exchange_rate, amount_in_usd, amount_in_eur,
+        lender_id, exit_account_id, description, reference_transaction_id, status, notes, created_by, recurrence_master_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+     RETURNING *`;
+
+    const params = (date: string, masterId: string | null) => [
+      date, data.type, data.amount, data.currency, data.exchange_rate ?? null,
+      amount_in_usd, amount_in_eur, data.lender_id ?? null, data.exit_account_id ?? null,
+      data.description ?? null, data.reference_transaction_id ?? null, data.status,
+      data.notes ?? null, createdBy, masterId,
+    ];
+
+    if (!isRecurring) {
+      const { rows } = await pool.query(SQL, params(data.date, null));
+      return rows[0];
+    }
+
+    const instanceDates = generateRecurringDates(data.date, recurrenceType, recurrenceEndDate);
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const { rows } = await client.query(SQL, params(data.date, null));
+      const master = rows[0];
+      for (const date of instanceDates) {
+        await client.query(SQL, params(date, master.id));
+      }
+      await client.query('COMMIT');
+      return master;
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
   },
 
   findById: async (id: string) => {

@@ -12,6 +12,8 @@ import {
 import { lendersApi } from '../api/lenders';
 import { exitAccountsApi } from '../api/exitAccounts';
 import { AxiosError } from 'axios';
+import { RecurrenceFields } from '../components/RecurrenceFields';
+import { EMPTY_RECURRENCE, RecurrenceState } from '../utils/recurrence';
 
 function fmt(n: number): string {
   return new Intl.NumberFormat('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
@@ -44,6 +46,7 @@ export function TransactionsPage(): JSX.Element {
   const [showModal, setShowModal] = useState(false);
   const [editTx, setEditTx] = useState<string | null>(null);
   const [form, setForm] = useState<TransactionInput>(EMPTY_FORM);
+  const [recurrence, setRecurrence] = useState<RecurrenceState>(EMPTY_RECURRENCE);
   const [formError, setFormError] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
@@ -62,12 +65,14 @@ export function TransactionsPage(): JSX.Element {
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: TransactionInput) => transactionsApi.create(data),
+    mutationFn: (data: TransactionInput & { recurrence_type?: string; recurrence_end_date?: string | null }) =>
+      transactionsApi.create(data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['transactions'] });
       qc.invalidateQueries({ queryKey: ['dashboard'] });
       setShowModal(false);
       setForm(EMPTY_FORM);
+      setRecurrence(EMPTY_RECURRENCE);
     },
     onError: (err: AxiosError<{ error: string }>) => {
       setFormError(err.response?.data?.error ?? 'Error al guardar');
@@ -98,6 +103,7 @@ export function TransactionsPage(): JSX.Element {
 
   const openCreate = () => {
     setForm(EMPTY_FORM);
+    setRecurrence(EMPTY_RECURRENCE);
     setEditTx(null);
     setFormError(null);
     setShowModal(true);
@@ -126,7 +132,11 @@ export function TransactionsPage(): JSX.Element {
     if (editTx) {
       updateMutation.mutate({ id: editTx, data: form });
     } else {
-      createMutation.mutate(form);
+      createMutation.mutate({
+        ...form,
+        recurrence_type: recurrence.type,
+        recurrence_end_date: recurrence.endDate,
+      });
     }
   };
 
@@ -516,6 +526,15 @@ export function TransactionsPage(): JSX.Element {
                   onChange={(e) => setForm({ ...form, notes: e.target.value || null })}
                 />
               </div>
+
+              {!editTx && (
+                <RecurrenceFields
+                  type={recurrence.type}
+                  endDate={recurrence.endDate}
+                  minDate={form.date}
+                  onChange={(type, endDate) => setRecurrence({ type, endDate })}
+                />
+              )}
 
               {formError && (
                 <div className="bg-red-900/30 border border-red-700 text-red-400 text-sm rounded-lg px-4 py-3">

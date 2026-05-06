@@ -14,7 +14,7 @@ const transactionTypeEnum = z.enum([
   'reinvestment',
 ]);
 
-const transactionSchema = z.object({
+const transactionBaseSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'La fecha debe tener formato AAAA-MM-DD'),
   type: transactionTypeEnum,
   amount: z.number().positive(),
@@ -27,6 +27,19 @@ const transactionSchema = z.object({
   status: z.enum(['pending', 'confirmed', 'cancelled']).default('confirmed'),
   notes: z.string().optional().nullable(),
 });
+
+const transactionSchema = transactionBaseSchema;
+
+const createTransactionSchema = transactionBaseSchema.extend({
+  recurrence_type: z.enum(['none', 'weekly', 'monthly']).default('none'),
+  recurrence_end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+}).refine(
+  (d) => d.recurrence_type === 'none' || !!d.recurrence_end_date,
+  { message: 'Se requiere fecha de fin para transacciones recurrentes', path: ['recurrence_end_date'] }
+).refine(
+  (d) => d.recurrence_type === 'none' || !d.recurrence_end_date || d.recurrence_end_date > d.date,
+  { message: 'La fecha de fin debe ser posterior a la fecha de inicio', path: ['recurrence_end_date'] }
+);
 
 export const TransactionsController = {
   list: async (req: Request, res: Response): Promise<void> => {
@@ -52,7 +65,7 @@ export const TransactionsController = {
   },
 
   create: async (req: Request, res: Response): Promise<void> => {
-    const parsed = transactionSchema.safeParse(req.body);
+    const parsed = createTransactionSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: 'Datos inválidos', details: parsed.error.flatten() });
       return;
