@@ -1,4 +1,5 @@
 import { useParams, Link } from 'react-router-dom';
+import { formatDate } from '../utils/date';
 import { useQuery } from '@tanstack/react-query';
 import {
   LineChart,
@@ -151,7 +152,7 @@ export function LenderDetailPage(): JSX.Element {
                   return (
                     <tr key={tx.id} className="border-t border-gray-700/50 hover:bg-gray-700/30">
                       <td className="px-4 py-3 text-gray-300 whitespace-nowrap">
-                        {new Date(tx.date).toLocaleDateString('es-ES')}
+                        {formatDate(tx.date)}
                       </td>
                       <td className="px-4 py-3 text-gray-300">{TRANSACTION_TYPE_LABELS[tx.type]}</td>
                       <td className="px-4 py-3 text-gray-400 max-w-[200px] truncate">{tx.description}</td>

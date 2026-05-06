@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { formatDate } from '../utils/date';
 
 const NAV_ITEMS = [
   { to: '/dashboard', label: 'Dashboard', icon: '◈' },
@@ -128,7 +129,7 @@ export function Layout({ children }: LayoutProps): JSX.Element {
           </button>
           <div className="flex items-center gap-4 ml-auto">
             <span className="text-sm text-gray-500">
-              {new Date().toLocaleDateString('es-ES', {
+              {formatDate(new Date(), {
                 weekday: 'long',
                 year: 'numeric',
                 month: 'long',

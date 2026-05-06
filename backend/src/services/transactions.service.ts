@@ -97,7 +97,7 @@ export const TransactionsService = {
     exchange_rate?: number | null;
     lender_id?: string | null;
     exit_account_id?: string | null;
-    description: string;
+    description?: string | null;
     reference_transaction_id?: string | null;
     status: TransactionStatus;
     notes?: string | null;
@@ -150,7 +150,7 @@ export const TransactionsService = {
     exchange_rate?: number | null;
     lender_id?: string | null;
     exit_account_id?: string | null;
-    description: string;
+    description?: string | null;
     reference_transaction_id?: string | null;
     status: TransactionStatus;
     notes?: string | null;

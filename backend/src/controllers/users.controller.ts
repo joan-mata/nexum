@@ -7,10 +7,10 @@ const acceptInviteSchema = z.object({
   password: z
     .string()
     .min(10)
-    .regex(/[A-Z]/, 'Must contain uppercase')
-    .regex(/[a-z]/, 'Must contain lowercase')
-    .regex(/[0-9]/, 'Must contain number')
-    .regex(/[^A-Za-z0-9]/, 'Must contain symbol'),
+    .regex(/[A-Z]/, 'Debe contener una mayúscula')
+    .regex(/[a-z]/, 'Debe contener una minúscula')
+    .regex(/[0-9]/, 'Debe contener un número')
+    .regex(/[^A-Za-z0-9]/, 'Debe contener un símbolo'),
 });
 
 const createUserSchema = z.object({
@@ -20,10 +20,10 @@ const createUserSchema = z.object({
   password: z
     .string()
     .min(10)
-    .regex(/[A-Z]/, 'Must contain uppercase')
-    .regex(/[a-z]/, 'Must contain lowercase')
-    .regex(/[0-9]/, 'Must contain number')
-    .regex(/[^A-Za-z0-9]/, 'Must contain symbol'),
+    .regex(/[A-Z]/, 'Debe contener una mayúscula')
+    .regex(/[a-z]/, 'Debe contener una minúscula')
+    .regex(/[0-9]/, 'Debe contener un número')
+    .regex(/[^A-Za-z0-9]/, 'Debe contener un símbolo'),
 });
 
 const inviteSchema = z.object({
@@ -37,17 +37,17 @@ const changePasswordSchema = z.object({
   new_password: z
     .string()
     .min(10)
-    .regex(/[A-Z]/, 'Must contain uppercase')
-    .regex(/[a-z]/, 'Must contain lowercase')
-    .regex(/[0-9]/, 'Must contain number')
-    .regex(/[^A-Za-z0-9]/, 'Must contain symbol'),
+    .regex(/[A-Z]/, 'Debe contener una mayúscula')
+    .regex(/[a-z]/, 'Debe contener una minúscula')
+    .regex(/[0-9]/, 'Debe contener un número')
+    .regex(/[^A-Za-z0-9]/, 'Debe contener un símbolo'),
 });
 
 export const UsersController = {
   create: async (req: Request, res: Response): Promise<void> => {
     const parsed = createUserSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: 'Invalid input', details: parsed.error.flatten() });
+      res.status(400).json({ error: 'Datos inválidos', details: parsed.error.flatten() });
       return;
     }
 
@@ -73,7 +73,7 @@ export const UsersController = {
   acceptInvite: async (req: Request, res: Response): Promise<void> => {
     const parsed = acceptInviteSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: 'Invalid input', details: parsed.error.flatten() });
+      res.status(400).json({ error: 'Datos inválidos', details: parsed.error.flatten() });
       return;
     }
 
@@ -95,7 +95,7 @@ export const UsersController = {
   invite: async (req: Request, res: Response): Promise<void> => {
     const parsed = inviteSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: 'Invalid input', details: parsed.error.flatten() });
+      res.status(400).json({ error: 'Datos inválidos', details: parsed.error.flatten() });
       return;
     }
 
@@ -124,7 +124,7 @@ export const UsersController = {
   changePassword: async (req: Request, res: Response): Promise<void> => {
     const parsed = changePasswordSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: 'Invalid input', details: parsed.error.flatten() });
+      res.status(400).json({ error: 'Datos inválidos', details: parsed.error.flatten() });
       return;
     }
 
@@ -142,7 +142,7 @@ export const UsersController = {
       return;
     }
 
-    res.json({ message: 'Password changed successfully' });
+    res.json({ message: 'Contraseña cambiada correctamente' });
   },
 
   toggleActive: async (req: Request, res: Response): Promise<void> => {
@@ -159,7 +159,7 @@ export const UsersController = {
     }
 
     res.json({
-      message: `User ${result.is_active ? 'activated' : 'deactivated'} successfully`,
+      message: `Usuario ${result.is_active ? 'activado' : 'desactivado'} correctamente`,
       is_active: result.is_active,
     });
   },

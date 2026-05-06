@@ -8,10 +8,10 @@ const changeOwnPasswordSchema = z.object({
   new_password: z
     .string()
     .min(10)
-    .regex(/[A-Z]/, 'Must contain uppercase')
-    .regex(/[a-z]/, 'Must contain lowercase')
-    .regex(/[0-9]/, 'Must contain number')
-    .regex(/[^A-Za-z0-9]/, 'Must contain symbol'),
+    .regex(/[A-Z]/, 'Debe contener una mayúscula')
+    .regex(/[a-z]/, 'Debe contener una minúscula')
+    .regex(/[0-9]/, 'Debe contener un número')
+    .regex(/[^A-Za-z0-9]/, 'Debe contener un símbolo'),
 });
 
 const loginSchema = z.object({
@@ -23,7 +23,7 @@ export const AuthController = {
   login: async (req: Request, res: Response): Promise<void> => {
     const parsed = loginSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: 'Invalid input', details: parsed.error.flatten() });
+      res.status(400).json({ error: 'Datos inválidos', details: parsed.error.flatten() });
       return;
     }
 
@@ -55,7 +55,7 @@ export const AuthController = {
     const refreshToken = req.cookies['refresh_token'] as string | undefined;
 
     if (!refreshToken) {
-      res.status(401).json({ error: 'Refresh token required' });
+      res.status(401).json({ error: 'Token de refresco requerido' });
       return;
     }
 
@@ -81,19 +81,19 @@ export const AuthController = {
     const refreshToken = req.cookies['refresh_token'] as string | undefined;
     await AuthService.logout(refreshToken);
     res.clearCookie('refresh_token', { path: '/api/auth' });
-    res.json({ message: 'Logged out successfully' });
+    res.json({ message: 'Sesión cerrada correctamente' });
   },
 
   logoutAll: async (req: Request, res: Response): Promise<void> => {
     await AuthService.logoutAll(req.user!.userId);
     res.clearCookie('refresh_token', { path: '/api/auth' });
-    res.json({ message: 'All sessions logged out successfully' });
+    res.json({ message: 'Todas las sesiones cerradas correctamente' });
   },
 
   changeOwnPassword: async (req: Request, res: Response): Promise<void> => {
     const parsed = changeOwnPasswordSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: 'Invalid input', details: parsed.error.flatten() });
+      res.status(400).json({ error: 'Datos inválidos', details: parsed.error.flatten() });
       return;
     }
 

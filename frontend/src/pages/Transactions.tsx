@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { formatDate } from '../utils/date';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   transactionsApi,
@@ -263,7 +264,7 @@ export function TransactionsPage(): JSX.Element {
                   return (
                     <tr key={tx.id} className="border-t border-gray-700/50 hover:bg-gray-700/30">
                       <td className="px-4 py-3 text-gray-300 whitespace-nowrap">
-                        {new Date(tx.date).toLocaleDateString('es-ES')}
+                        {formatDate(tx.date)}
                       </td>
                       <td className="px-4 py-3 text-gray-300 whitespace-nowrap">
                         {TRANSACTION_TYPE_LABELS[tx.type]}
@@ -497,13 +498,12 @@ export function TransactionsPage(): JSX.Element {
               )}
 
               <div>
-                <label className="label">Descripción *</label>
+                <label className="label">Descripción</label>
                 <input
                   type="text"
                   className="input"
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  required
                   maxLength={1000}
                 />
               </div>

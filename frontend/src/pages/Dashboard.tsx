@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { formatDate } from '../utils/date';
 import {
   BarChart,
   Bar,
@@ -133,7 +134,7 @@ export function DashboardPage(): JSX.Element {
                   {recent.map((tx: Transaction) => (
                     <tr key={tx.id} className="border-b border-gray-700/50 hover:bg-gray-700/30">
                       <td className="py-2 text-gray-300">
-                        {new Date(tx.date).toLocaleDateString('es-ES')}
+                        {formatDate(tx.date)}
                       </td>
                       <td className="py-2 text-gray-300 max-w-[140px] truncate">
                         {TRANSACTION_TYPE_LABELS[tx.type]}
@@ -168,10 +169,10 @@ export function DashboardPage(): JSX.Element {
                 >
                   <div className="text-center shrink-0">
                     <p className="text-xs text-gray-400">
-                      {new Date(ev.expected_date).toLocaleDateString('es-ES', { month: 'short' })}
+                      {formatDate(ev.expected_date, { month: 'short' })}
                     </p>
                     <p className="text-lg font-bold text-gray-100 leading-none">
-                      {new Date(ev.expected_date).getDate()}
+                      {parseInt(ev.expected_date.slice(8, 10), 10)}
                     </p>
                   </div>
                   <div className="flex-1 min-w-0">

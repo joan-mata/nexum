@@ -15,14 +15,14 @@ const transactionTypeEnum = z.enum([
 ]);
 
 const transactionSchema = z.object({
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD'),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'La fecha debe tener formato AAAA-MM-DD'),
   type: transactionTypeEnum,
   amount: z.number().positive(),
   currency: z.enum(['EUR', 'USD']),
   exchange_rate: z.number().positive().optional().nullable(),
   lender_id: z.string().uuid().optional().nullable(),
   exit_account_id: z.string().uuid().optional().nullable(),
-  description: z.string().min(1).max(1000),
+  description: z.string().max(1000).optional().nullable(),
   reference_transaction_id: z.string().uuid().optional().nullable(),
   status: z.enum(['pending', 'confirmed', 'cancelled']).default('confirmed'),
   notes: z.string().optional().nullable(),
@@ -54,7 +54,7 @@ export const TransactionsController = {
   create: async (req: Request, res: Response): Promise<void> => {
     const parsed = transactionSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: 'Invalid input', details: parsed.error.flatten() });
+      res.status(400).json({ error: 'Datos inválidos', details: parsed.error.flatten() });
       return;
     }
 
@@ -65,7 +65,7 @@ export const TransactionsController = {
   getById: async (req: Request, res: Response): Promise<void> => {
     const transaction = await TransactionsService.findById(req.params['id']!);
     if (!transaction) {
-      res.status(404).json({ error: 'Transaction not found' });
+      res.status(404).json({ error: 'Transacción no encontrada' });
       return;
     }
     res.json(transaction);
@@ -74,13 +74,13 @@ export const TransactionsController = {
   update: async (req: Request, res: Response): Promise<void> => {
     const parsed = transactionSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: 'Invalid input', details: parsed.error.flatten() });
+      res.status(400).json({ error: 'Datos inválidos', details: parsed.error.flatten() });
       return;
     }
 
     const transaction = await TransactionsService.update(req.params['id']!, parsed.data);
     if (!transaction) {
-      res.status(404).json({ error: 'Transaction not found' });
+      res.status(404).json({ error: 'Transacción no encontrada' });
       return;
     }
     res.json(transaction);
@@ -89,9 +89,9 @@ export const TransactionsController = {
   cancel: async (req: Request, res: Response): Promise<void> => {
     const result = await TransactionsService.cancel(req.params['id']!);
     if (!result) {
-      res.status(404).json({ error: 'Transaction not found' });
+      res.status(404).json({ error: 'Transacción no encontrada' });
       return;
     }
-    res.json({ message: 'Transaction cancelled successfully' });
+    res.json({ message: 'Transacción cancelada correctamente' });
   },
 };

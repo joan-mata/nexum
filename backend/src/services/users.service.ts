@@ -95,7 +95,7 @@ export const UsersService = {
       'SELECT COUNT(*) FROM users WHERE is_active = true'
     );
     if (parseInt(activeCount[0].count) >= 10) {
-      return { success: false, status: 400, error: 'Maximum active users limit (10) reached' };
+      return { success: false, status: 400, error: 'Límite máximo de 10 usuarios activos alcanzado' };
     }
 
     const { rows: existing } = await pool.query(
@@ -136,7 +136,7 @@ export const UsersService = {
       'SELECT COUNT(*) FROM users WHERE is_active = true'
     );
     if (parseInt(activeCount[0].count) >= 10) {
-      return { success: false, status: 400, error: 'Maximum active users limit (10) reached' };
+      return { success: false, status: 400, error: 'Límite máximo de 10 usuarios activos alcanzado' };
     }
 
     const { rows: existing } = await pool.query(
@@ -224,12 +224,12 @@ export const UsersService = {
     );
 
     if (adminRows.length === 0) {
-      return { success: false, status: 400, error: 'Admin not found' };
+      return { success: false, status: 400, error: 'Administrador no encontrado' };
     }
 
     const adminValid = await bcrypt.compare(adminPassword, adminRows[0].password_hash);
     if (!adminValid) {
-      return { success: false, status: 401, error: 'Invalid admin password' };
+      return { success: false, status: 401, error: 'Contraseña de administrador incorrecta' };
     }
 
     const { rows: targetRows } = await pool.query(
@@ -238,7 +238,7 @@ export const UsersService = {
     );
 
     if (targetRows.length === 0) {
-      return { success: false, status: 404, error: 'User not found' };
+      return { success: false, status: 404, error: 'Usuario no encontrado' };
     }
 
     const passwordHash = await bcrypt.hash(newPassword, 14);
@@ -265,7 +265,7 @@ export const UsersService = {
     userAgent: string | undefined
   ): Promise<{ success: false; status: 400 | 404; error: string } | { success: true; is_active: boolean }> => {
     if (targetUserId === adminUserId) {
-      return { success: false, status: 400, error: 'Cannot deactivate your own account' };
+      return { success: false, status: 400, error: 'No puedes desactivar tu propia cuenta' };
     }
 
     const { rows } = await pool.query(
@@ -274,7 +274,7 @@ export const UsersService = {
     );
 
     if (rows.length === 0) {
-      return { success: false, status: 404, error: 'User not found' };
+      return { success: false, status: 404, error: 'Usuario no encontrado' };
     }
 
     const newState = !rows[0].is_active;

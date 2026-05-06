@@ -18,7 +18,7 @@ export const LendersController = {
   create: async (req: Request, res: Response): Promise<void> => {
     const parsed = lenderSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: 'Invalid input', details: parsed.error.flatten() });
+      res.status(400).json({ error: 'Datos inválidos', details: parsed.error.flatten() });
       return;
     }
 
@@ -30,7 +30,7 @@ export const LendersController = {
   getById: async (req: Request, res: Response): Promise<void> => {
     const lender = await LendersService.findById(req.params['id']!);
     if (!lender) {
-      res.status(404).json({ error: 'Lender not found' });
+      res.status(404).json({ error: 'Prestamista no encontrado' });
       return;
     }
     res.json(lender);
@@ -39,7 +39,7 @@ export const LendersController = {
   getStats: async (req: Request, res: Response): Promise<void> => {
     const result = await LendersService.getStats(req.params['id']!);
     if (!result) {
-      res.status(404).json({ error: 'Lender not found' });
+      res.status(404).json({ error: 'Prestamista no encontrado' });
       return;
     }
     res.json(result);
@@ -48,14 +48,14 @@ export const LendersController = {
   update: async (req: Request, res: Response): Promise<void> => {
     const parsed = lenderSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: 'Invalid input', details: parsed.error.flatten() });
+      res.status(400).json({ error: 'Datos inválidos', details: parsed.error.flatten() });
       return;
     }
 
     const { name, email, phone, notes } = parsed.data;
     const lender = await LendersService.update(req.params['id']!, name, email, phone, notes);
     if (!lender) {
-      res.status(404).json({ error: 'Lender not found' });
+      res.status(404).json({ error: 'Prestamista no encontrado' });
       return;
     }
     res.json(lender);
@@ -64,9 +64,9 @@ export const LendersController = {
   deactivate: async (req: Request, res: Response): Promise<void> => {
     const result = await LendersService.deactivate(req.params['id']!);
     if (!result) {
-      res.status(404).json({ error: 'Lender not found' });
+      res.status(404).json({ error: 'Prestamista no encontrado' });
       return;
     }
-    res.json({ message: 'Lender deactivated successfully' });
+    res.json({ message: 'Prestamista desactivado correctamente' });
   },
 };

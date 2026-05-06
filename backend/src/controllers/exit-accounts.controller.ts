@@ -19,7 +19,7 @@ export const ExitAccountsController = {
   create: async (req: Request, res: Response): Promise<void> => {
     const parsed = exitAccountSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: 'Invalid input', details: parsed.error.flatten() });
+      res.status(400).json({ error: 'Datos inválidos', details: parsed.error.flatten() });
       return;
     }
 
@@ -30,13 +30,13 @@ export const ExitAccountsController = {
   update: async (req: Request, res: Response): Promise<void> => {
     const parsed = exitAccountSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: 'Invalid input', details: parsed.error.flatten() });
+      res.status(400).json({ error: 'Datos inválidos', details: parsed.error.flatten() });
       return;
     }
 
     const account = await ExitAccountsService.update(req.params['id']!, parsed.data);
     if (!account) {
-      res.status(404).json({ error: 'Exit account not found' });
+      res.status(404).json({ error: 'Cuenta de salida no encontrada' });
       return;
     }
     res.json(account);
@@ -45,9 +45,9 @@ export const ExitAccountsController = {
   deactivate: async (req: Request, res: Response): Promise<void> => {
     const result = await ExitAccountsService.deactivate(req.params['id']!);
     if (!result) {
-      res.status(404).json({ error: 'Exit account not found' });
+      res.status(404).json({ error: 'Cuenta de salida no encontrada' });
       return;
     }
-    res.json({ message: 'Exit account deactivated successfully' });
+    res.json({ message: 'Cuenta de salida desactivada correctamente' });
   },
 };

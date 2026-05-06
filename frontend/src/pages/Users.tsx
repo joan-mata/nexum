@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { usersApi, User, AuditEntry } from '../api/users';
 import { AxiosError } from 'axios';
 import { PasswordInput } from '../components/PasswordInput';
+import { formatDateTime } from '../utils/date';
+import { ROLE_LABELS, auditActionLabel } from '../utils/labels';
 
 function timeAgo(dateStr: string | null): string {
   if (!dateStr) return 'Nunca';
@@ -178,7 +180,7 @@ export function UsersPage(): JSX.Element {
                               : 'bg-gray-700 text-gray-400'
                           }`}
                         >
-                          {u.role}
+                          {ROLE_LABELS[u.role] ?? u.role}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-center">
@@ -250,12 +252,12 @@ export function UsersPage(): JSX.Element {
                   {auditLog.map((entry: AuditEntry) => (
                     <tr key={entry.id} className="border-t border-gray-700/50 hover:bg-gray-700/30">
                       <td className="px-4 py-3 text-gray-400 whitespace-nowrap text-xs">
-                        {new Date(entry.created_at).toLocaleString('es-ES')}
+                        {formatDateTime(entry.created_at)}
                       </td>
                       <td className="px-4 py-3 text-gray-300">
                         {entry.username ?? '-'}
                       </td>
-                      <td className="px-4 py-3 text-gray-300">{entry.action}</td>
+                      <td className="px-4 py-3 text-gray-300">{auditActionLabel(entry.action)}</td>
                       <td className="px-4 py-3 text-gray-400 font-mono text-xs">
                         {entry.ip_address ?? '-'}
                       </td>
@@ -305,8 +307,8 @@ export function UsersPage(): JSX.Element {
                   value={createForm.role}
                   onChange={(e) => setCreateForm({ ...createForm, role: e.target.value as 'admin' | 'operator' })}
                 >
-                  <option value="operator">Operator</option>
-                  <option value="admin">Admin</option>
+                  <option value="operator">Operador</option>
+                  <option value="admin">Administrador</option>
                 </select>
               </div>
               <div>

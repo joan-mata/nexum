@@ -61,7 +61,7 @@ export const AuthService = {
           success: false,
           status: 429,
           body: {
-            error: `Account temporarily locked. Try again in ${remainingMin} minutes.`,
+            error: `Cuenta temporalmente bloqueada. Inténtalo en ${remainingMin} minutos.`,
             locked_until: user.locked_until,
           },
         };
@@ -152,7 +152,7 @@ export const AuthService = {
       const tokenRecord = rows[0];
 
       if (!tokenRecord) {
-        return { success: false, status: 401, body: { error: 'Invalid refresh token' } };
+        return { success: false, status: 401, body: { error: 'Token de refresco inválido' } };
       }
 
       if (tokenRecord.revoked_at || tokenRecord.used_at) {
@@ -160,15 +160,15 @@ export const AuthService = {
           'UPDATE refresh_tokens SET revoked_at = NOW() WHERE user_id = $1 AND revoked_at IS NULL',
           [tokenRecord.user_id]
         );
-        return { success: false, status: 401, body: { error: 'Token already used. Please log in again.' } };
+        return { success: false, status: 401, body: { error: 'Token ya utilizado. Por favor, inicia sesión de nuevo.' } };
       }
 
       if (new Date(tokenRecord.expires_at) < new Date()) {
-        return { success: false, status: 401, body: { error: 'Refresh token expired' } };
+        return { success: false, status: 401, body: { error: 'Token de refresco expirado' } };
       }
 
       if (!tokenRecord.is_active) {
-        return { success: false, status: 401, body: { error: 'User account is disabled' } };
+        return { success: false, status: 401, body: { error: 'La cuenta de usuario está desactivada' } };
       }
 
       await client.query('UPDATE refresh_tokens SET used_at = NOW() WHERE id = $1', [tokenRecord.id]);
