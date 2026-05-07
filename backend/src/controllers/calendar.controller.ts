@@ -5,7 +5,7 @@ import { CalendarService } from '../services/calendar.service';
 const eventSchema = z.object({
   expected_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'La fecha debe tener formato AAAA-MM-DD'),
   type: z.string().min(1).max(30),
-  description: z.string().min(1).max(1000),
+  description: z.string().max(1000).default(''),
   estimated_amount: z.number().positive().optional().nullable(),
   currency: z.enum(['EUR', 'USD']).optional().nullable(),
   lender_id: z.string().uuid().optional().nullable(),
@@ -23,7 +23,7 @@ const eventSchema = z.object({
 const updateSchema = z.object({
   expected_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'La fecha debe tener formato AAAA-MM-DD'),
   type: z.string().min(1).max(30),
-  description: z.string().min(1).max(1000),
+  description: z.string().max(1000).default(''),
   estimated_amount: z.number().positive().optional().nullable(),
   currency: z.enum(['EUR', 'USD']).optional().nullable(),
   lender_id: z.string().uuid().optional().nullable(),
@@ -89,6 +89,15 @@ export const CalendarController = {
       return;
     }
     res.json(event);
+  },
+
+  deleteEvent: async (req: Request, res: Response): Promise<void> => {
+    const result = await CalendarService.deleteEvent(req.params['id']!);
+    if (!result) {
+      res.status(404).json({ error: 'Evento no encontrado o ya completado' });
+      return;
+    }
+    res.json({ ok: true });
   },
 
   cancelSeries: async (req: Request, res: Response): Promise<void> => {

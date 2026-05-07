@@ -5,6 +5,7 @@ import {
   transactionsApi,
   TRANSACTION_TYPE_LABELS,
   INFLOW_TYPES,
+  Transaction,
   TransactionType,
   TransactionInput,
   TransactionFilters,
@@ -18,6 +19,7 @@ function fmt(n: number): string {
   return new Intl.NumberFormat('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
 }
 
+
 const EMPTY_FORM: TransactionInput = {
   date: new Date().toISOString().slice(0, 10),
   type: 'loan_received',
@@ -29,6 +31,8 @@ const EMPTY_FORM: TransactionInput = {
   description: '',
   status: 'confirmed',
   notes: null,
+  commission_eur: null,
+  commission_usd: null,
 };
 
 const TYPES_NEEDING_LENDER: TransactionType[] = [
@@ -41,7 +45,12 @@ const TYPES_NEEDING_EXIT: TransactionType[] = ['transfer_out'];
 
 export function TransactionsPage(): JSX.Element {
   const qc = useQueryClient();
-  const [filters, setFilters] = useState<TransactionFilters>({ page: 1, limit: 50 });
+  const defaultDateTo = (() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() + 1);
+    return d.toISOString().slice(0, 10);
+  })();
+  const [filters, setFilters] = useState<TransactionFilters>({ page: 1, limit: 50, date_to: defaultDateTo });
   const [showModal, setShowModal] = useState(false);
   const [editTx, setEditTx] = useState<string | null>(null);
   const [form, setForm] = useState<TransactionInput>(EMPTY_FORM);
@@ -165,6 +174,27 @@ export function TransactionsPage(): JSX.Element {
   const transactions = data?.data ?? [];
   const total = data?.total ?? 0;
 
+  // Group: commissions (reference_transaction_id set) under their parent
+  const commissionMap: Record<string, Transaction[]> = {};
+  const mainTxs: Transaction[] = [];
+  for (const tx of transactions) {
+    if (tx.reference_transaction_id) {
+      (commissionMap[tx.reference_transaction_id] ??= []).push(tx);
+    } else {
+      mainTxs.push(tx);
+    }
+  }
+  // Flatten: parent row then its commissions, then any orphaned commissions at end
+  const orderedTxs: Transaction[] = [];
+  for (const tx of mainTxs) {
+    orderedTxs.push(tx);
+    for (const c of commissionMap[tx.id] ?? []) orderedTxs.push(c);
+  }
+  // Any commission whose parent is not on this page
+  for (const tx of transactions) {
+    if (tx.reference_transaction_id && !orderedTxs.find(t => t.id === tx.id)) orderedTxs.push(tx);
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -246,7 +276,7 @@ export function TransactionsPage(): JSX.Element {
             <div className="flex justify-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500" />
             </div>
-          ) : transactions.length === 0 ? (
+          ) : orderedTxs.length === 0 ? (
             <p className="text-center text-gray-500 py-12">No hay transacciones</p>
           ) : (
             <table className="w-full text-sm">
@@ -263,71 +293,92 @@ export function TransactionsPage(): JSX.Element {
                 </tr>
               </thead>
               <tbody>
-                {transactions.map((tx) => {
+                {orderedTxs.map((tx) => {
+                  const isCommission = tx.reference_transaction_id != null;
                   const inflow = INFLOW_TYPES.includes(tx.type);
                   return (
-                    <tr key={tx.id} className="border-t border-gray-700/50 hover:bg-gray-700/30">
-                      <td className="px-4 py-3 text-gray-300 whitespace-nowrap">
-                        {formatDate(tx.date)}
+                    <tr
+                      key={tx.id}
+                      className={
+                        isCommission
+                          ? 'bg-gray-800/30 hover:bg-gray-700/20'
+                          : 'border-t border-gray-700/50 hover:bg-gray-700/30'
+                      }
+                    >
+                      <td className="px-4 py-2 text-gray-400 whitespace-nowrap text-xs">
+                        {isCommission ? '' : formatDate(tx.date)}
                       </td>
-                      <td className="px-4 py-3 text-gray-300 whitespace-nowrap">
-                        {TRANSACTION_TYPE_LABELS[tx.type]}
+                      <td className="px-4 py-2 whitespace-nowrap">
+                        {isCommission ? (
+                          <span className="text-gray-500 text-xs">
+                            <span className="mr-1 text-gray-600">↳</span>
+                            {TRANSACTION_TYPE_LABELS[tx.type]}
+                          </span>
+                        ) : (
+                          <span className="text-gray-300">{TRANSACTION_TYPE_LABELS[tx.type]}</span>
+                        )}
                       </td>
-                      <td className="px-4 py-3 text-gray-400 max-w-[100px] truncate">
-                        {tx.lender_name ?? '-'}
+                      <td className="px-4 py-2 text-gray-400 max-w-[100px] truncate text-xs">
+                        {isCommission ? '' : (tx.lender_name ?? '-')}
                       </td>
-                      <td className="px-4 py-3 text-gray-300 max-w-[200px] truncate">
+                      <td className="px-4 py-2 text-gray-400 max-w-[200px] truncate text-xs">
                         {tx.description}
                       </td>
-                      <td className="px-4 py-3 text-right whitespace-nowrap">
-                        <span className={inflow ? 'positive' : 'negative'}>
+                      <td className="px-4 py-2 text-right whitespace-nowrap">
+                        <span className={`${isCommission ? 'text-xs' : ''} ${inflow ? 'positive' : 'negative'}`}>
                           {inflow ? '+' : '-'}{fmt(Number(tx.amount))} {tx.currency}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-right whitespace-nowrap">
+                      <td className="px-4 py-2 text-right whitespace-nowrap">
                         {tx.amount_in_eur != null ? (
-                          <span className={inflow ? 'positive' : 'negative'}>
+                          <span className={`${isCommission ? 'text-xs' : ''} ${inflow ? 'positive' : 'negative'}`}>
                             {inflow ? '+' : '-'}€{fmt(Number(tx.amount_in_eur))}
                           </span>
                         ) : (
                           <span className="text-gray-500">-</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-center">
-                        <span
-                          className={`badge ${
-                            tx.status === 'confirmed'
-                              ? 'bg-green-900/50 text-green-400'
-                              : tx.status === 'pending'
-                              ? 'bg-yellow-900/50 text-yellow-400'
-                              : 'bg-red-900/50 text-red-400'
-                          }`}
-                        >
-                          {tx.status === 'confirmed'
-                            ? 'Confirmada'
-                            : tx.status === 'pending'
-                            ? 'Pendiente'
-                            : 'Cancelada'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right whitespace-nowrap">
-                        <button
-                          onClick={() => openEdit(tx)}
-                          className="text-xs text-brand-400 hover:text-brand-300 mr-3"
-                        >
-                          Editar
-                        </button>
-                        {tx.status !== 'cancelled' && (
-                          <button
-                            onClick={() => {
-                              if (confirm('¿Cancelar esta transacción?')) {
-                                cancelMutation.mutate(tx.id);
-                              }
-                            }}
-                            className="text-xs text-red-400 hover:text-red-300"
+                      <td className="px-4 py-2 text-center">
+                        {isCommission ? null : (
+                          <span
+                            className={`badge ${
+                              tx.status === 'confirmed'
+                                ? 'bg-green-900/50 text-green-400'
+                                : tx.status === 'pending'
+                                ? 'bg-yellow-900/50 text-yellow-400'
+                                : 'bg-red-900/50 text-red-400'
+                            }`}
                           >
-                            Cancelar
-                          </button>
+                            {tx.status === 'confirmed'
+                              ? 'Confirmada'
+                              : tx.status === 'pending'
+                              ? 'Pendiente'
+                              : 'Cancelada'}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2 text-right whitespace-nowrap">
+                        {!isCommission && (
+                          <>
+                            <button
+                              onClick={() => openEdit(tx)}
+                              className="text-xs text-brand-400 hover:text-brand-300 mr-3"
+                            >
+                              Editar
+                            </button>
+                            {tx.status !== 'cancelled' && (
+                              <button
+                                onClick={() => {
+                                  if (confirm('¿Cancelar esta transacción?')) {
+                                    cancelMutation.mutate(tx.id);
+                                  }
+                                }}
+                                className="text-xs text-red-400 hover:text-red-300"
+                              >
+                                Cancelar
+                              </button>
+                            )}
+                          </>
                         )}
                       </td>
                     </tr>
@@ -524,6 +575,42 @@ export function TransactionsPage(): JSX.Element {
                   onChange={(e) => setForm({ ...form, notes: e.target.value || null })}
                 />
               </div>
+
+              {!editTx && recurrence.type === 'none' && (
+                <div className="border-t border-gray-700 pt-4 space-y-3">
+                  <p className="text-xs text-gray-500 uppercase tracking-wide">Comisiones vinculadas</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="label">Comisión de cambio (EUR)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        className="input"
+                        placeholder="Ej: 15.00"
+                        value={form.commission_eur ?? ''}
+                        onChange={(e) =>
+                          setForm({ ...form, commission_eur: e.target.value ? parseFloat(e.target.value) : null })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <label className="label">Comisión de transferencia (USD)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        className="input"
+                        placeholder="Ej: 25.00"
+                        value={form.commission_usd ?? ''}
+                        onChange={(e) =>
+                          setForm({ ...form, commission_usd: e.target.value ? parseFloat(e.target.value) : null })
+                        }
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {formError && (
                 <div className="bg-red-900/30 border border-red-700 text-red-400 text-sm rounded-lg px-4 py-3">

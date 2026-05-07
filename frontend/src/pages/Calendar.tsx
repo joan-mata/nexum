@@ -100,16 +100,19 @@ export function CalendarPage(): JSX.Element {
     },
   });
 
-  const completeMutation = useMutation({
-    mutationFn: (id: string) => calendarApi.complete(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['calendar'] }),
-  });
-
   const detachMutation = useMutation({
     mutationFn: (id: string) => calendarApi.detach(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['calendar'] }),
     onError: (err: AxiosError<{ error: string }>) => {
       alert(err.response?.data?.error ?? 'Error al desanclar');
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => calendarApi.delete(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['calendar'] }),
+    onError: (err: AxiosError<{ error: string }>) => {
+      alert(err.response?.data?.error ?? 'Error al eliminar');
     },
   });
 
@@ -148,10 +151,10 @@ export function CalendarPage(): JSX.Element {
 
   const openEdit = (ev: ScheduledEvent) => {
     setForm({
-      expected_date: ev.expected_date,
+      expected_date: ev.expected_date.slice(0, 10),
       type: ev.type,
       description: ev.description,
-      estimated_amount: ev.estimated_amount,
+      estimated_amount: ev.estimated_amount != null ? parseFloat(String(ev.estimated_amount)) : null,
       currency: ev.currency,
       lender_id: ev.lender_id,
       notes: ev.notes,
@@ -194,32 +197,32 @@ export function CalendarPage(): JSX.Element {
   const selectedTxs = selectedDay ? (txMap[selectedDay] ?? []) : [];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-100">Calendario</h1>
+        <h1 className="text-xl font-bold text-gray-100">Calendario</h1>
         <button onClick={() => openCreate()} className="btn-primary text-sm">
           + Nuevo evento
         </button>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
         {/* Calendar Grid */}
         <div className="xl:col-span-2 card">
-          <div className="flex items-center justify-between mb-4">
-            <button onClick={prevMonth} className="btn-secondary px-3 py-1.5 text-sm">←</button>
-            <h2 className="text-lg font-semibold text-gray-100">
+          <div className="flex items-center justify-between mb-3">
+            <button onClick={prevMonth} className="btn-secondary px-3 py-1 text-sm">←</button>
+            <h2 className="text-base font-semibold text-gray-100">
               {MONTH_NAMES[month]} {year}
             </h2>
-            <button onClick={nextMonth} className="btn-secondary px-3 py-1.5 text-sm">→</button>
+            <button onClick={nextMonth} className="btn-secondary px-3 py-1 text-sm">→</button>
           </div>
 
-          <div className="grid grid-cols-7 mb-2">
+          <div className="grid grid-cols-7 mb-1">
             {DAY_NAMES.map((d) => (
-              <div key={d} className="text-center text-xs text-gray-500 py-1 font-medium">{d}</div>
+              <div key={d} className="text-center text-xs text-gray-500 py-0.5 font-medium">{d}</div>
             ))}
           </div>
 
-          <div className="grid grid-cols-7 gap-1">
+          <div className="grid grid-cols-7 gap-0.5">
             {Array.from({ length: firstDay }).map((_, i) => (
               <div key={`empty-${i}`} />
             ))}
@@ -236,7 +239,7 @@ export function CalendarPage(): JSX.Element {
                 <button
                   key={day}
                   onClick={() => setSelectedDay(day === selectedDay ? null : day)}
-                  className={`aspect-square rounded-lg p-1 flex flex-col items-center justify-start text-xs transition-colors ${
+                  className={`h-[62px] rounded-md p-0.5 flex flex-col items-center justify-start text-xs transition-colors ${
                     isSelected
                       ? 'bg-brand-600 text-white'
                       : isToday
@@ -244,7 +247,7 @@ export function CalendarPage(): JSX.Element {
                       : 'hover:bg-gray-700 text-gray-300'
                   }`}
                 >
-                  <span className="font-medium">{day}</span>
+                  <span className="font-medium leading-none mt-1">{day}</span>
                   {(dayEvents.length > 0 || (txMap[day] ?? []).length > 0) && (
                     <div className="flex gap-0.5 mt-0.5 flex-wrap justify-center">
                       {dayEvents.slice(0, 2).map((ev) => (
@@ -310,10 +313,9 @@ export function CalendarPage(): JSX.Element {
                                 {income ? '↑' : '↓'}
                               </span>
                               <p className="text-sm font-medium text-gray-100 truncate">
-                                {tx.description || TRANSACTION_TYPE_LABELS[tx.type]}
+                                {TRANSACTION_TYPE_LABELS[tx.type]}
                               </p>
                             </div>
-                            <p className="text-xs text-gray-400 mt-0.5">{TRANSACTION_TYPE_LABELS[tx.type]}</p>
                             {tx.lender_name && (
                               <p className="text-xs text-gray-500">{tx.lender_name}</p>
                             )}
@@ -323,7 +325,7 @@ export function CalendarPage(): JSX.Element {
                               {income ? '+' : '-'}{fmt(Number(tx.amount_in_eur ?? tx.amount))} €
                             </span>
                             {tx.status === 'pending' && (
-                              <span className="text-xs text-yellow-400 bg-yellow-900/30 px-1.5 py-0.5 rounded">pendiente</span>
+                              <span className="text-xs text-yellow-400 bg-yellow-900/30 px-1.5 py-0.5 rounded">Pendiente</span>
                             )}
                           </div>
                         </div>
@@ -346,9 +348,11 @@ export function CalendarPage(): JSX.Element {
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              <p className="text-sm font-medium text-gray-100 truncate">
-                                {ev.description}
-                              </p>
+                              {ev.description && (
+                                <p className="text-sm font-medium text-gray-100 truncate">
+                                  {ev.description}
+                                </p>
+                              )}
                               {(isMaster || isInstance) && (
                                 <span className="text-xs text-purple-400 bg-purple-900/30 px-1.5 py-0.5 rounded shrink-0">
                                   ↺ {isMaster ? RECURRENCE_LABELS[ev.recurrence_type] : 'serie'}
@@ -365,47 +369,51 @@ export function CalendarPage(): JSX.Element {
                               </p>
                             )}
                           </div>
-                          {ev.is_completed ? (
-                            <span className="badge bg-green-900/50 text-green-400 shrink-0">
-                              Completado
-                            </span>
-                          ) : (
-                            <button
-                              onClick={() => completeMutation.mutate(ev.id)}
-                              className="text-xs text-green-400 hover:text-green-300 shrink-0"
-                            >
-                              Completar
-                            </button>
-                          )}
-                        </div>
-
-                        {!ev.is_completed && (
-                          <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2">
-                            <button
-                              onClick={() => openEdit(ev)}
-                              className="text-xs text-brand-400 hover:text-brand-300"
-                            >
-                              Editar
-                            </button>
-                            {isInstance && (
-                              <button
-                                onClick={() => detachMutation.mutate(ev.id)}
-                                disabled={detachMutation.isPending}
-                                className="text-xs text-orange-400 hover:text-orange-300 disabled:opacity-50"
-                              >
-                                Desanclar de serie
-                              </button>
-                            )}
-                            {isMaster && (
-                              <button
-                                onClick={() => setConfirmCancelSeries(ev)}
-                                className="text-xs text-red-400 hover:text-red-300"
-                              >
-                                Cancelar serie
-                              </button>
+                          <div className="flex flex-col items-end gap-1 shrink-0">
+                            {ev.is_completed ? (
+                              <span className="badge bg-green-900/50 text-green-400">
+                                Completado
+                              </span>
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() => openEdit(ev)}
+                                  className="text-xs text-brand-400 hover:text-brand-300"
+                                >
+                                  Editar
+                                </button>
+                                {!isMaster && (
+                                  <button
+                                    onClick={() => {
+                                      if (confirm('¿Eliminar este evento?')) deleteMutation.mutate(ev.id);
+                                    }}
+                                    disabled={deleteMutation.isPending}
+                                    className="text-xs text-red-400 hover:text-red-300 disabled:opacity-50"
+                                  >
+                                    Eliminar
+                                  </button>
+                                )}
+                                {isInstance && (
+                                  <button
+                                    onClick={() => detachMutation.mutate(ev.id)}
+                                    disabled={detachMutation.isPending}
+                                    className="text-xs text-orange-400 hover:text-orange-300 disabled:opacity-50"
+                                  >
+                                    Desanclar
+                                  </button>
+                                )}
+                                {isMaster && (
+                                  <button
+                                    onClick={() => setConfirmCancelSeries(ev)}
+                                    className="text-xs text-red-400 hover:text-red-300"
+                                  >
+                                    Cancelar serie
+                                  </button>
+                                )}
+                              </>
                             )}
                           </div>
-                        )}
+                        </div>
                       </div>
                     );
                   })}
@@ -472,13 +480,12 @@ export function CalendarPage(): JSX.Element {
                 />
               </div>
               <div>
-                <label className="label">Descripción *</label>
+                <label className="label">Descripción</label>
                 <input
                   type="text"
                   className="input"
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  required
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">

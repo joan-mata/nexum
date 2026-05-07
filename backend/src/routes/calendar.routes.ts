@@ -11,5 +11,6 @@ router.put('/events/:id', CalendarController.updateEvent);
 router.put('/events/:id/complete', CalendarController.completeEvent);
 router.put('/events/:id/detach', CalendarController.detachEvent);
 router.delete('/events/series/:id', CalendarController.cancelSeries);
+router.delete('/events/:id', CalendarController.deleteEvent);
 
 export default router;

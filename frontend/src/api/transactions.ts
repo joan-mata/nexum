@@ -49,6 +49,8 @@ export interface TransactionInput {
   reference_transaction_id?: string | null;
   status?: TransactionStatus;
   notes?: string | null;
+  commission_eur?: number | null;
+  commission_usd?: number | null;
 }
 
 export interface TransactionListResponse {

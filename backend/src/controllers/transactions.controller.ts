@@ -33,6 +33,8 @@ const transactionSchema = transactionBaseSchema;
 const createTransactionSchema = transactionBaseSchema.extend({
   recurrence_type: z.enum(['none', 'weekly', 'monthly']).default('none'),
   recurrence_end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+  commission_eur: z.number().positive().optional().nullable(),
+  commission_usd: z.number().positive().optional().nullable(),
 }).refine(
   (d) => d.recurrence_type === 'none' || !!d.recurrence_end_date,
   { message: 'Se requiere fecha de fin para transacciones recurrentes', path: ['recurrence_end_date'] }

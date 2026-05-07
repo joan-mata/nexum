@@ -130,6 +130,14 @@ export const CalendarService = {
     return rows[0] ?? null;
   },
 
+  deleteEvent: async (id: string) => {
+    const { rows } = await pool.query(
+      `DELETE FROM scheduled_events WHERE id = $1 AND is_completed = false RETURNING id`,
+      [id]
+    );
+    return rows[0] ?? null;
+  },
+
   detachFromRecurrence: async (id: string) => {
     const { rows } = await pool.query(
       `UPDATE scheduled_events

@@ -105,6 +105,8 @@ export const TransactionsService = {
     notes?: string | null;
     recurrence_type?: 'none' | 'weekly' | 'monthly';
     recurrence_end_date?: string | null;
+    commission_eur?: number | null;
+    commission_usd?: number | null;
   }, createdBy: string) => {
     const { amount_in_eur, amount_in_usd } = calcAmounts(data.amount, data.currency, data.exchange_rate);
     const recurrenceType = data.recurrence_type ?? 'none';
@@ -113,27 +115,73 @@ export const TransactionsService = {
 
     const SQL = `INSERT INTO transactions
        (date, type, amount, currency, exchange_rate, amount_in_usd, amount_in_eur,
-        lender_id, exit_account_name, description, reference_transaction_id, status, notes, created_by, recurrence_master_id)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+        lender_id, exit_account_name, description, reference_transaction_id, status, notes, created_by, recurrence_master_id,
+        recurrence_type, recurrence_end_date)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
      RETURNING *`;
 
-    const params = (date: string, masterId: string | null) => [
+    const params = (date: string, masterId: string | null, recType: string | null = null, recEnd: string | null = null) => [
       date, data.type, data.amount, data.currency, data.exchange_rate ?? null,
       amount_in_usd, amount_in_eur, data.lender_id ?? null, data.exit_account_name ?? null,
       data.description ?? null, data.reference_transaction_id ?? null, data.status,
-      data.notes ?? null, createdBy, masterId,
+      data.notes ?? null, createdBy, masterId, recType, recEnd,
     ];
 
     if (!isRecurring) {
-      const { rows } = await pool.query(SQL, params(data.date, null));
-      return rows[0];
+      const hasCommissions = (data.commission_eur != null) || (data.commission_usd != null);
+      if (!hasCommissions) {
+        const { rows } = await pool.query(SQL, params(data.date, null));
+        return rows[0];
+      }
+
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        const { rows } = await client.query(SQL, params(data.date, null));
+        const main = rows[0];
+
+        const commissionSQL = `INSERT INTO transactions
+           (date, type, amount, currency, exchange_rate, amount_in_usd, amount_in_eur,
+            lender_id, exit_account_name, description, reference_transaction_id, status, notes, created_by, recurrence_master_id,
+            recurrence_type, recurrence_end_date)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+         RETURNING *`;
+
+        if (data.commission_eur != null) {
+          const { amount_in_eur: cEur, amount_in_usd: cUsd } = calcAmounts(data.commission_eur, 'EUR', data.exchange_rate);
+          await client.query(commissionSQL, [
+            data.date, 'exchange_fee', data.commission_eur, 'EUR', data.exchange_rate ?? null,
+            cUsd, cEur, data.lender_id ?? null, null,
+            'Comisión de cambio', main.id, data.status,
+            null, createdBy, null, 'none', null,
+          ]);
+        }
+
+        if (data.commission_usd != null) {
+          const { amount_in_eur: cEur, amount_in_usd: cUsd } = calcAmounts(data.commission_usd, 'USD', data.exchange_rate);
+          await client.query(commissionSQL, [
+            data.date, 'transfer_fee', data.commission_usd, 'USD', data.exchange_rate ?? null,
+            cUsd, cEur, data.lender_id ?? null, null,
+            'Comisión de transferencia', main.id, data.status,
+            null, createdBy, null, 'none', null,
+          ]);
+        }
+
+        await client.query('COMMIT');
+        return main;
+      } catch (e) {
+        await client.query('ROLLBACK');
+        throw e;
+      } finally {
+        client.release();
+      }
     }
 
     const instanceDates = generateRecurringDates(data.date, recurrenceType, recurrenceEndDate);
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      const { rows } = await client.query(SQL, params(data.date, null));
+      const { rows } = await client.query(SQL, params(data.date, null, recurrenceType, recurrenceEndDate));
       const master = rows[0];
       for (const date of instanceDates) {
         await client.query(SQL, params(date, master.id));

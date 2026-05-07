@@ -43,6 +43,7 @@ export const calendarApi = {
     }),
   detach: (id: string) =>
     client.put<ScheduledEvent>(`/calendar/events/${id}/detach`),
+  delete: (id: string) => client.delete(`/calendar/events/${id}`),
   cancelSeries: (masterId: string) =>
     client.delete(`/calendar/events/series/${masterId}`),
 };
