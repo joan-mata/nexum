@@ -452,4 +452,30 @@ export const TransactionsService = {
     );
     return rows[0] ?? null;
   },
+
+  hardDelete: async (id: string) => {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      const { rows } = await client.query('SELECT id, recurrence_master_id FROM transactions WHERE id = $1', [id]);
+      if (rows.length === 0) { await client.query('ROLLBACK'); return null; }
+
+      // Delete linked commissions (exchange_fee / transfer_fee children)
+      await client.query('DELETE FROM transactions WHERE reference_transaction_id = $1', [id]);
+
+      // If master of a recurring series, delete all instances first
+      await client.query('DELETE FROM transactions WHERE recurrence_master_id = $1', [id]);
+
+      await client.query('DELETE FROM transactions WHERE id = $1', [id]);
+
+      await client.query('COMMIT');
+      return { id };
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
+  },
 };

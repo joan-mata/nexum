@@ -14,6 +14,7 @@ import { lendersApi } from '../api/lenders';
 import { AxiosError } from 'axios';
 import { RecurrenceFields } from '../components/RecurrenceFields';
 import { EMPTY_RECURRENCE, RecurrenceState } from '../utils/recurrence';
+import { useAuth } from '../hooks/useAuth';
 
 function fmt(n: number): string {
   return new Intl.NumberFormat('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
@@ -47,6 +48,8 @@ const TYPES_NEEDING_EXIT: TransactionType[] = ['transfer_out'];
 
 export function TransactionsPage(): JSX.Element {
   const qc = useQueryClient();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const defaultDateTo = (() => {
     const d = new Date();
     d.setMonth(d.getMonth() + 1);
@@ -58,6 +61,7 @@ export function TransactionsPage(): JSX.Element {
   const [form, setForm] = useState<TransactionInput>(EMPTY_FORM);
   const [recurrence, setRecurrence] = useState<RecurrenceState>(EMPTY_RECURRENCE);
   const [formError, setFormError] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['transactions', filters],
@@ -103,6 +107,16 @@ export function TransactionsPage(): JSX.Element {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['transactions'] });
       qc.invalidateQueries({ queryKey: ['dashboard'] });
+      setDeleteTarget(null);
+    },
+  });
+
+  const hardDeleteMutation = useMutation({
+    mutationFn: (id: string) => transactionsApi.hardDelete(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['transactions'] });
+      qc.invalidateQueries({ queryKey: ['dashboard'] });
+      setDeleteTarget(null);
     },
   });
 
@@ -374,7 +388,7 @@ export function TransactionsPage(): JSX.Element {
                             >
                               Editar
                             </button>
-                            {tx.status !== 'cancelled' && (
+                            {tx.status !== 'cancelled' && !isAdmin && (
                               <button
                                 onClick={() => {
                                   if (confirm('¿Cancelar esta transacción?')) {
@@ -384,6 +398,14 @@ export function TransactionsPage(): JSX.Element {
                                 className="text-xs text-red-400 hover:text-red-300"
                               >
                                 Cancelar
+                              </button>
+                            )}
+                            {isAdmin && (
+                              <button
+                                onClick={() => setDeleteTarget(tx.id)}
+                                className="text-xs text-red-400 hover:text-red-300"
+                              >
+                                {tx.status === 'cancelled' ? 'Eliminar' : 'Cancelar/Eliminar'}
                               </button>
                             )}
                           </>
@@ -661,6 +683,39 @@ export function TransactionsPage(): JSX.Element {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Admin delete modal */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
+          <div className="bg-gray-800 rounded-xl border border-gray-700 w-full max-w-sm p-6">
+            <h3 className="text-lg font-semibold text-gray-100 mb-2">Gestionar transacción</h3>
+            <p className="text-sm text-gray-400 mb-6">¿Qué quieres hacer con esta transacción?</p>
+            <div className="space-y-2">
+              <button
+                onClick={() => cancelMutation.mutate(deleteTarget)}
+                disabled={cancelMutation.isPending || hardDeleteMutation.isPending}
+                className="w-full btn-secondary text-sm disabled:opacity-50"
+              >
+                Cancelar transacción (queda en el historial)
+              </button>
+              <button
+                onClick={() => hardDeleteMutation.mutate(deleteTarget)}
+                disabled={cancelMutation.isPending || hardDeleteMutation.isPending}
+                className="w-full btn-primary bg-red-700 hover:bg-red-600 text-sm disabled:opacity-50"
+              >
+                Eliminar permanentemente
+              </button>
+              <button
+                onClick={() => setDeleteTarget(null)}
+                disabled={cancelMutation.isPending || hardDeleteMutation.isPending}
+                className="w-full text-sm text-gray-400 hover:text-gray-200 pt-1"
+              >
+                Volver
+              </button>
+            </div>
           </div>
         </div>
       )}

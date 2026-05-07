@@ -93,6 +93,7 @@ export const transactionsApi = {
   update: (id: string, data: TransactionInput) =>
     client.put<Transaction>(`/transactions/${id}`, data),
   cancel: (id: string) => client.delete(`/transactions/${id}`),
+  hardDelete: (id: string) => client.delete(`/transactions/${id}/permanent`),
   updateAllRecurring: (id: string, data: TransactionInput) =>
     client.put(`/transactions/${id}/recurring`, data),
   updateRecurrenceEnd: (id: string, end_date: string) =>

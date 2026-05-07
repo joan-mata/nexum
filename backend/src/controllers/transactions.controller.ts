@@ -145,4 +145,13 @@ export const TransactionsController = {
     }
     res.json({ message: 'Transacción cancelada correctamente' });
   },
+
+  hardDelete: async (req: Request, res: Response): Promise<void> => {
+    const result = await TransactionsService.hardDelete(req.params['id']!);
+    if (!result) {
+      res.status(404).json({ error: 'Transacción no encontrada' });
+      return;
+    }
+    res.json({ message: 'Transacción eliminada permanentemente' });
+  },
 };
