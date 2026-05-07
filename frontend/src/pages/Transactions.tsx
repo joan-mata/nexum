@@ -31,8 +31,10 @@ const EMPTY_FORM: TransactionInput = {
   description: '',
   status: 'confirmed',
   notes: null,
-  commission_eur: null,
-  commission_usd: null,
+  commission_exchange_amount: null,
+  commission_exchange_currency: 'EUR' as 'EUR' | 'USD',
+  commission_transfer_amount: null,
+  commission_transfer_currency: 'USD' as 'EUR' | 'USD',
 };
 
 const TYPES_NEEDING_LENDER: TransactionType[] = [
@@ -112,7 +114,9 @@ export function TransactionsPage(): JSX.Element {
     setShowModal(true);
   };
 
-  const openEdit = (tx: import('../api/transactions').Transaction) => {
+  const openEdit = (tx: Transaction, commissions: Transaction[] = []) => {
+    const exchangeComm = commissions.find(c => c.type === 'exchange_fee');
+    const transferComm = commissions.find(c => c.type === 'transfer_fee');
     setForm({
       date: tx.date.slice(0, 10),
       type: tx.type,
@@ -124,6 +128,10 @@ export function TransactionsPage(): JSX.Element {
       description: tx.description,
       status: tx.status,
       notes: tx.notes,
+      commission_exchange_amount: exchangeComm ? Number(exchangeComm.amount) : null,
+      commission_exchange_currency: (exchangeComm?.currency ?? 'EUR') as 'EUR' | 'USD',
+      commission_transfer_amount: transferComm ? Number(transferComm.amount) : null,
+      commission_transfer_currency: (transferComm?.currency ?? 'USD') as 'EUR' | 'USD',
     });
     setEditTx(tx.id);
     setFormError(null);
@@ -361,7 +369,7 @@ export function TransactionsPage(): JSX.Element {
                         {!isCommission && (
                           <>
                             <button
-                              onClick={() => openEdit(tx)}
+                              onClick={() => openEdit(tx, commissionMap[tx.id] ?? [])}
                               className="text-xs text-brand-400 hover:text-brand-300 mr-3"
                             >
                               Editar
@@ -484,6 +492,24 @@ export function TransactionsPage(): JSX.Element {
                 </select>
               </div>
 
+              {TYPES_NEEDING_LENDER.includes(form.type) && (
+                <div>
+                  <label className="label">Prestamista</label>
+                  <select
+                    className="input"
+                    value={form.lender_id ?? ''}
+                    onChange={(e) => setForm({ ...form, lender_id: e.target.value || null })}
+                  >
+                    <option value="">Sin prestamista</option>
+                    {lenders.map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="label">Importe *</label>
@@ -525,24 +551,6 @@ export function TransactionsPage(): JSX.Element {
                 />
               </div>
 
-              {TYPES_NEEDING_LENDER.includes(form.type) && (
-                <div>
-                  <label className="label">Prestamista</label>
-                  <select
-                    className="input"
-                    value={form.lender_id ?? ''}
-                    onChange={(e) => setForm({ ...form, lender_id: e.target.value || null })}
-                  >
-                    <option value="">Sin prestamista</option>
-                    {lenders.map((l) => (
-                      <option key={l.id} value={l.id}>
-                        {l.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
               {TYPES_NEEDING_EXIT.includes(form.type) && (
                 <div>
                   <label className="label">Cuenta de salida</label>
@@ -555,6 +563,64 @@ export function TransactionsPage(): JSX.Element {
                   />
                 </div>
               )}
+
+              <div className="border-t border-gray-700 pt-4 space-y-3">
+                <p className="text-xs text-gray-500 uppercase tracking-wide">Comisiones vinculadas</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="label">Comisión de cambio</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      className="input"
+                      placeholder="Ej: 15.00"
+                      value={form.commission_exchange_amount ?? ''}
+                      onChange={(e) =>
+                        setForm({ ...form, commission_exchange_amount: e.target.value ? parseFloat(e.target.value) : null })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <label className="label">Moneda</label>
+                    <select
+                      className="input"
+                      value={form.commission_exchange_currency ?? 'EUR'}
+                      onChange={(e) => setForm({ ...form, commission_exchange_currency: e.target.value as 'EUR' | 'USD' })}
+                    >
+                      <option value="EUR">EUR</option>
+                      <option value="USD">USD</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="label">Comisión de transferencia</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      className="input"
+                      placeholder="Ej: 25.00"
+                      value={form.commission_transfer_amount ?? ''}
+                      onChange={(e) =>
+                        setForm({ ...form, commission_transfer_amount: e.target.value ? parseFloat(e.target.value) : null })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <label className="label">Moneda</label>
+                    <select
+                      className="input"
+                      value={form.commission_transfer_currency ?? 'USD'}
+                      onChange={(e) => setForm({ ...form, commission_transfer_currency: e.target.value as 'EUR' | 'USD' })}
+                    >
+                      <option value="EUR">EUR</option>
+                      <option value="USD">USD</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
 
               <div>
                 <label className="label">Descripción</label>
@@ -575,42 +641,6 @@ export function TransactionsPage(): JSX.Element {
                   onChange={(e) => setForm({ ...form, notes: e.target.value || null })}
                 />
               </div>
-
-              {!editTx && recurrence.type === 'none' && (
-                <div className="border-t border-gray-700 pt-4 space-y-3">
-                  <p className="text-xs text-gray-500 uppercase tracking-wide">Comisiones vinculadas</p>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="label">Comisión de cambio (EUR)</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        className="input"
-                        placeholder="Ej: 15.00"
-                        value={form.commission_eur ?? ''}
-                        onChange={(e) =>
-                          setForm({ ...form, commission_eur: e.target.value ? parseFloat(e.target.value) : null })
-                        }
-                      />
-                    </div>
-                    <div>
-                      <label className="label">Comisión de transferencia (USD)</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        className="input"
-                        placeholder="Ej: 25.00"
-                        value={form.commission_usd ?? ''}
-                        onChange={(e) =>
-                          setForm({ ...form, commission_usd: e.target.value ? parseFloat(e.target.value) : null })
-                        }
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {formError && (
                 <div className="bg-red-900/30 border border-red-700 text-red-400 text-sm rounded-lg px-4 py-3">

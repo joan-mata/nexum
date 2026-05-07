@@ -49,8 +49,10 @@ export interface TransactionInput {
   reference_transaction_id?: string | null;
   status?: TransactionStatus;
   notes?: string | null;
-  commission_eur?: number | null;
-  commission_usd?: number | null;
+  commission_exchange_amount?: number | null;
+  commission_exchange_currency?: 'EUR' | 'USD';
+  commission_transfer_amount?: number | null;
+  commission_transfer_currency?: 'EUR' | 'USD';
 }
 
 export interface TransactionListResponse {

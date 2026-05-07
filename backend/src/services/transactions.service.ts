@@ -105,8 +105,10 @@ export const TransactionsService = {
     notes?: string | null;
     recurrence_type?: 'none' | 'weekly' | 'monthly';
     recurrence_end_date?: string | null;
-    commission_eur?: number | null;
-    commission_usd?: number | null;
+    commission_exchange_amount?: number | null;
+    commission_exchange_currency?: 'EUR' | 'USD';
+    commission_transfer_amount?: number | null;
+    commission_transfer_currency?: 'EUR' | 'USD';
   }, createdBy: string) => {
     const { amount_in_eur, amount_in_usd } = calcAmounts(data.amount, data.currency, data.exchange_rate);
     const recurrenceType = data.recurrence_type ?? 'none';
@@ -128,7 +130,7 @@ export const TransactionsService = {
     ];
 
     if (!isRecurring) {
-      const hasCommissions = (data.commission_eur != null) || (data.commission_usd != null);
+      const hasCommissions = (data.commission_exchange_amount != null) || (data.commission_transfer_amount != null);
       if (!hasCommissions) {
         const { rows } = await pool.query(SQL, params(data.date, null));
         return rows[0];
@@ -147,20 +149,22 @@ export const TransactionsService = {
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
          RETURNING *`;
 
-        if (data.commission_eur != null) {
-          const { amount_in_eur: cEur, amount_in_usd: cUsd } = calcAmounts(data.commission_eur, 'EUR', data.exchange_rate);
+        if (data.commission_exchange_amount != null) {
+          const exchCurrency = data.commission_exchange_currency ?? 'EUR';
+          const { amount_in_eur: cEur, amount_in_usd: cUsd } = calcAmounts(data.commission_exchange_amount, exchCurrency, data.exchange_rate);
           await client.query(commissionSQL, [
-            data.date, 'exchange_fee', data.commission_eur, 'EUR', data.exchange_rate ?? null,
+            data.date, 'exchange_fee', data.commission_exchange_amount, exchCurrency, data.exchange_rate ?? null,
             cUsd, cEur, data.lender_id ?? null, null,
             'Comisión de cambio', main.id, data.status,
             null, createdBy, null, 'none', null,
           ]);
         }
 
-        if (data.commission_usd != null) {
-          const { amount_in_eur: cEur, amount_in_usd: cUsd } = calcAmounts(data.commission_usd, 'USD', data.exchange_rate);
+        if (data.commission_transfer_amount != null) {
+          const transCurrency = data.commission_transfer_currency ?? 'USD';
+          const { amount_in_eur: cEur, amount_in_usd: cUsd } = calcAmounts(data.commission_transfer_amount, transCurrency, data.exchange_rate);
           await client.query(commissionSQL, [
-            data.date, 'transfer_fee', data.commission_usd, 'USD', data.exchange_rate ?? null,
+            data.date, 'transfer_fee', data.commission_transfer_amount, transCurrency, data.exchange_rate ?? null,
             cUsd, cEur, data.lender_id ?? null, null,
             'Comisión de transferencia', main.id, data.status,
             null, createdBy, null, 'none', null,
@@ -221,33 +225,112 @@ export const TransactionsService = {
     reference_transaction_id?: string | null;
     status: TransactionStatus;
     notes?: string | null;
+    commission_exchange_amount?: number | null;
+    commission_exchange_currency?: 'EUR' | 'USD';
+    commission_transfer_amount?: number | null;
+    commission_transfer_currency?: 'EUR' | 'USD';
   }) => {
     const { amount_in_eur, amount_in_usd } = calcAmounts(data.amount, data.currency, data.exchange_rate);
 
-    const { rows } = await pool.query(
-      `UPDATE transactions SET
-         date=$1, type=$2, amount=$3, currency=$4, exchange_rate=$5,
-         amount_in_usd=$6, amount_in_eur=$7, lender_id=$8, exit_account_name=$9,
-         description=$10, reference_transaction_id=$11, status=$12, notes=$13, updated_at=NOW()
-       WHERE id=$14 RETURNING *`,
-      [
-        data.date,
-        data.type,
-        data.amount,
-        data.currency,
-        data.exchange_rate ?? null,
-        amount_in_usd,
-        amount_in_eur,
-        data.lender_id ?? null,
-        data.exit_account_name ?? null,
-        data.description,
-        data.reference_transaction_id ?? null,
-        data.status,
-        data.notes ?? null,
-        id,
-      ]
-    );
-    return rows[0] ?? null;
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      const { rows } = await client.query(
+        `UPDATE transactions SET
+           date=$1, type=$2, amount=$3, currency=$4, exchange_rate=$5,
+           amount_in_usd=$6, amount_in_eur=$7, lender_id=$8, exit_account_name=$9,
+           description=$10, reference_transaction_id=$11, status=$12, notes=$13, updated_at=NOW()
+         WHERE id=$14 RETURNING *`,
+        [
+          data.date,
+          data.type,
+          data.amount,
+          data.currency,
+          data.exchange_rate ?? null,
+          amount_in_usd,
+          amount_in_eur,
+          data.lender_id ?? null,
+          data.exit_account_name ?? null,
+          data.description,
+          data.reference_transaction_id ?? null,
+          data.status,
+          data.notes ?? null,
+          id,
+        ]
+      );
+
+      if (!rows[0]) {
+        await client.query('ROLLBACK');
+        return null;
+      }
+
+      const commissionSQL = `INSERT INTO transactions
+         (date, type, amount, currency, exchange_rate, amount_in_usd, amount_in_eur,
+          lender_id, exit_account_name, description, reference_transaction_id, status, notes, created_by, recurrence_master_id,
+          recurrence_type, recurrence_end_date)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`;
+
+      // Handle exchange_fee commission
+      const { rows: exchRows } = await client.query(
+        `SELECT id FROM transactions WHERE reference_transaction_id = $1 AND type = 'exchange_fee' AND status != 'cancelled'`,
+        [id]
+      );
+      if (data.commission_exchange_amount != null) {
+        const exchCurrency = data.commission_exchange_currency ?? 'EUR';
+        const { amount_in_eur: cEur, amount_in_usd: cUsd } = calcAmounts(data.commission_exchange_amount, exchCurrency, data.exchange_rate);
+        if (exchRows.length > 0) {
+          await client.query(
+            `UPDATE transactions SET amount=$1, currency=$2, amount_in_eur=$3, amount_in_usd=$4, updated_at=NOW()
+             WHERE id=$5`,
+            [data.commission_exchange_amount, exchCurrency, cEur, cUsd, exchRows[0].id]
+          );
+        } else {
+          await client.query(commissionSQL, [
+            data.date, 'exchange_fee', data.commission_exchange_amount, exchCurrency, data.exchange_rate ?? null,
+            cUsd, cEur, data.lender_id ?? null, null,
+            'Comisión de cambio', id, data.status,
+            null, rows[0].created_by, null, 'none', null,
+          ]);
+        }
+      } else if (exchRows.length > 0) {
+        await client.query(`DELETE FROM transactions WHERE id=$1`, [exchRows[0].id]);
+      }
+
+      // Handle transfer_fee commission
+      const { rows: transRows } = await client.query(
+        `SELECT id FROM transactions WHERE reference_transaction_id = $1 AND type = 'transfer_fee' AND status != 'cancelled'`,
+        [id]
+      );
+      if (data.commission_transfer_amount != null) {
+        const transCurrency = data.commission_transfer_currency ?? 'USD';
+        const { amount_in_eur: cEur, amount_in_usd: cUsd } = calcAmounts(data.commission_transfer_amount, transCurrency, data.exchange_rate);
+        if (transRows.length > 0) {
+          await client.query(
+            `UPDATE transactions SET amount=$1, currency=$2, amount_in_eur=$3, amount_in_usd=$4, updated_at=NOW()
+             WHERE id=$5`,
+            [data.commission_transfer_amount, transCurrency, cEur, cUsd, transRows[0].id]
+          );
+        } else {
+          await client.query(commissionSQL, [
+            data.date, 'transfer_fee', data.commission_transfer_amount, transCurrency, data.exchange_rate ?? null,
+            cUsd, cEur, data.lender_id ?? null, null,
+            'Comisión de transferencia', id, data.status,
+            null, rows[0].created_by, null, 'none', null,
+          ]);
+        }
+      } else if (transRows.length > 0) {
+        await client.query(`DELETE FROM transactions WHERE id=$1`, [transRows[0].id]);
+      }
+
+      await client.query('COMMIT');
+      return rows[0];
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
   },
 
   updateAllRecurring: async (id: string, data: {
